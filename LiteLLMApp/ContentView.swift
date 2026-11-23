@@ -10,6 +10,9 @@ struct ContentView: View {
     @State private var selection: UUID?
     @State private var showModels = false
     @State private var showProxy = false
+    @State private var showOnboarding = false
+
+    private var t: (String) -> String { L10n.shared.t }
 
     var body: some View {
         NavigationSplitView {
@@ -19,7 +22,7 @@ struct ContentView: View {
                         Image(systemName: "bubble.left.and.bubble.right")
                             .foregroundStyle(.secondary)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(conversation.title)
+                            Text(conversation.title == Conversation.defaultTitle ? t("Nouvelle conversation") : conversation.title)
                                 .lineLimit(1)
                             Text(conversation.updatedAt, format: .relative(presentation: .numeric))
                                 .font(.caption2)
@@ -30,20 +33,20 @@ struct ContentView: View {
                 }
                 .onDelete(perform: deleteConversations)
             }
-            .navigationTitle("Conversations")
+            .navigationTitle(t("Conversations"))
             .navigationSplitViewColumnWidth(min: 220, ideal: 280)
             .toolbar {
                 ToolbarItem(placement: .navigation) {
                     Button(action: newConversation) {
                         Image(systemName: "square.and.pencil")
                     }
-                    .help("Nouvelle conversation")
+                    .help(t("Nouvelle conversation"))
                 }
                 ToolbarItem(placement: .navigation) {
                     Button { showModels = true } label: {
                         Image(systemName: "server.rack")
                     }
-                    .help("Modèles disponibles sur le serveur")
+                    .help(t("Modèles disponibles sur le serveur"))
                 }
                 ToolbarItem(placement: .navigation) {
                     Button { showProxy = true } label: {
@@ -54,13 +57,19 @@ struct ContentView: View {
                             }
                         }
                     }
-                    .help("Gérer le proxy LiteLLM local (installation, démarrage, configuration)")
+                    .help(t("Gérer le proxy LiteLLM local (installation, démarrage, configuration)"))
+                }
+                ToolbarItem(placement: .navigation) {
+                    Button { showOnboarding = true } label: {
+                        Image(systemName: "wand.and.stars")
+                    }
+                    .help(t("Assistant de configuration"))
                 }
                 ToolbarItem(placement: .navigation) {
                     Button { openSettings() } label: {
                         Image(systemName: "gear")
                     }
-                    .help("Réglages")
+                    .help(t("Réglages"))
                 }
             }
         } detail: {
@@ -68,11 +77,11 @@ struct ContentView: View {
                 ChatView(conversation: conversation, settings: settings)
             } else {
                 ContentUnavailableView {
-                    Label("Aucune conversation", systemImage: "bubble.left.and.bubble.right")
+                    Label(t("Aucune conversation"), systemImage: "bubble.left.and.bubble.right")
                 } description: {
-                    Text("Créez une conversation pour discuter avec vos modèles LiteLLM.")
+                    Text(t("Créez une conversation pour discuter avec vos modèles LiteLLM."))
                 } actions: {
-                    Button("Nouvelle conversation") { newConversation() }
+                    Button(t("Nouvelle conversation")) { newConversation() }
                 }
             }
         }
@@ -84,8 +93,16 @@ struct ContentView: View {
                 .environmentObject(settings)
                 .environmentObject(proxy)
         }
+        .sheet(isPresented: $showOnboarding) {
+            OnboardingView(onOpenChat: { newConversation() })
+                .environmentObject(settings)
+                .environmentObject(proxy)
+        }
         .task {
             proxy.autoStartIfNeeded()
+            if !OnboardingState.hasCompleted {
+                showOnboarding = true
+            }
         }
     }
 

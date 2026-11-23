@@ -11,6 +11,8 @@ struct ChatView: View {
         self._vm = State(initialValue: ChatViewModel(conversation: conversation, settings: settings))
     }
 
+    private var t: (String) -> String { L10n.shared.t }
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -19,8 +21,8 @@ struct ChatView: View {
             Divider()
             composer
         }
-        .navigationTitle(conversation.title)
-        .alert("Erreur", isPresented: $vm.showError) {
+        .navigationTitle(conversation.title == Conversation.defaultTitle ? t("Nouvelle conversation") : conversation.title)
+        .alert(t("Erreur"), isPresented: $vm.showError) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(vm.errorMessage)
@@ -38,8 +40,8 @@ struct ChatView: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            Picker("Modèle", selection: modelBinding) {
-                Text("Par défaut").tag("")
+            Picker(t("Modèle"), selection: modelBinding) {
+                Text(t("Par défaut")).tag("")
                 if !conversation.model.isEmpty && !settings.availableModels.contains(conversation.model) {
                     Text(conversation.model).tag(conversation.model)
                 }
@@ -53,7 +55,7 @@ struct ChatView: View {
             Button { showParameters.toggle() } label: {
                 Image(systemName: "slider.horizontal.3")
             }
-            .help("Paramètres de génération")
+            .help(t("Paramètres de génération"))
             .popover(isPresented: $showParameters) {
                 parametersPopover
                     .padding()
@@ -62,7 +64,7 @@ struct ChatView: View {
             Button { Task { await refreshModels() } } label: {
                 Image(systemName: "arrow.clockwise")
             }
-            .help("Actualiser la liste des modèles depuis le serveur")
+            .help(t("Actualiser la liste des modèles depuis le serveur"))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
@@ -70,20 +72,20 @@ struct ChatView: View {
 
     private var parametersPopover: some View {
         Form {
-            Section("Génération") {
+            Section(t("Génération")) {
                 HStack {
-                    Text("Température")
+                    Text(t("Température"))
                     Slider(value: $settings.temperature, in: 0...2, step: 0.05)
                     Text(settings.temperature, format: .number.precision(.fractionLength(2)))
                         .frame(width: 44, alignment: .trailing)
                         .foregroundStyle(.secondary)
                 }
                 Stepper(value: $settings.maxTokens, in: 16...200_000, step: 256) {
-                    Text("Tokens max : \(settings.maxTokens)")
+                    Text(L10n.shared.t("Tokens max : %@", settings.maxTokens))
                 }
             }
-            Section("Invite système") {
-                TextField("Invite système (optionnel)", text: $settings.systemPrompt, axis: .vertical)
+            Section(t("Invite système")) {
+                TextField(t("Invite système (optionnel)"), text: $settings.systemPrompt, axis: .vertical)
                     .lineLimit(2...5)
             }
         }
@@ -96,7 +98,7 @@ struct ChatView: View {
             let models = try await client.listModels()
             settings.availableModels = models.map(\.id).sorted()
         } catch {
-            vm.errorMessage = "Impossible de récupérer les modèles : \(error.localizedDescription)"
+            vm.errorMessage = L10n.shared.t("Impossible de récupérer les modèles : %@", error.localizedDescription)
             vm.showError = true
         }
     }
@@ -145,7 +147,7 @@ struct ChatView: View {
             .buttonStyle(.plain)
             .keyboardShortcut(.return, modifiers: .command)
             .disabled(!vm.isStreaming && vm.input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            .help(vm.isStreaming ? "Arrêter la génération" : "Envoyer (⌘↩)")
+            .help(vm.isStreaming ? t("Arrêter la génération") : t("Envoyer (⌘↩)"))
         }
         .padding(12)
     }

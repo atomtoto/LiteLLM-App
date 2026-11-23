@@ -20,7 +20,7 @@ struct MessageRow: View {
                             .foregroundStyle(.secondary)
                             .textSelection(.enabled)
                     } label: {
-                        Text("Raisonnement")
+                        Text(L10n.shared.t("Raisonnement"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -32,7 +32,7 @@ struct MessageRow: View {
                     messageBody
                 }
                 if let tokenUsage = message.tokenUsage {
-                    Text("\(tokenUsage) tokens")
+                    Text(L10n.shared.t("%@ tokens", tokenUsage))
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
@@ -45,7 +45,7 @@ struct MessageRow: View {
                 pasteboard.clearContents()
                 pasteboard.setString(message.content, forType: .string)
             } label: {
-                Label("Copier", systemImage: "doc.on.doc")
+                Label(L10n.shared.t("Copier"), systemImage: "doc.on.doc")
             }
         }
     }

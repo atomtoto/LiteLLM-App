@@ -119,29 +119,42 @@ public final class ProxyManager: ObservableObject {
         guard !isBusy, !isInstalled else { return }
         installTask = Task { [weak self] in
             guard let self else { return }
-            state = .installing
-            installLog = ""
-            do {
-                let python = try Self.findPython()
-                appendInstall("Création du venv avec \(python.path)…\n")
-                _ = try await runProcess(executable: python, arguments: ["-m", "venv", venvDir.path],
-                                         log: .install)
-                guard FileManager.default.fileExists(atPath: pipBinary.path) else {
-                    throw ProxyError.venvCreationFailed
-                }
-                appendInstall("Installation de litellm[proxy] (cela peut prendre quelques minutes)…\n")
-                let status = try await runProcess(executable: pipBinary,
-                                                  arguments: ["install", "--upgrade", "litellm[proxy]"],
-                                                  log: .install)
-                guard status == 0, isInstalled else {
-                    throw ProxyError.pipInstallFailed(status)
-                }
-                appendInstall("Installation terminée.\n")
-                state = .installed
-            } catch {
-                appendInstall("\nERREUR : \(error.localizedDescription)\n")
-                state = .failed(error.localizedDescription)
+            await self.runInstall()
+        }
+    }
+
+    /// Version awaitable de `install()` (utilisée par l'assistant de configuration).
+    /// Renvoie true si le binaire litellm est présent à la fin.
+    @discardableResult
+    public func installAndWait() async -> Bool {
+        guard !isInstalled, !isBusy else { return isInstalled }
+        await runInstall()
+        return isInstalled
+    }
+
+    private func runInstall() async {
+        state = .installing
+        installLog = ""
+        do {
+            let python = try Self.findPython()
+            appendInstall("Création du venv avec \(python.path)…\n")
+            _ = try await runProcess(executable: python, arguments: ["-m", "venv", venvDir.path],
+                                     log: .install)
+            guard FileManager.default.fileExists(atPath: pipBinary.path) else {
+                throw ProxyError.venvCreationFailed
             }
+            appendInstall("Installation de litellm[proxy] (cela peut prendre quelques minutes)…\n")
+            let status = try await runProcess(executable: pipBinary,
+                                              arguments: ["install", "--upgrade", "litellm[proxy]"],
+                                              log: .install)
+            guard status == 0, isInstalled else {
+                throw ProxyError.pipInstallFailed(status)
+            }
+            appendInstall("Installation terminée.\n")
+            state = .installed
+        } catch {
+            appendInstall("\nERREUR : \(error.localizedDescription)\n")
+            state = .failed(error.localizedDescription)
         }
     }
 
@@ -167,6 +180,26 @@ public final class ProxyManager: ObservableObject {
     public func autoStartIfNeeded() {
         guard settings.autoStart, isInstalled, !isRunning else { return }
         start()
+    }
+
+    /// Démarre le proxy puis attend qu'il réponde (ou échoue). Renvoie l'état final.
+    @discardableResult
+    public func startAndWait(timeout: TimeInterval = 180) async -> ProxyState {
+        guard isInstalled, !isBusy else { return state }
+        await startNow()
+        return await waitUntilReady(timeout: timeout)
+    }
+
+    /// Attend que le proxy soit running (ou failed), au plus `timeout` secondes.
+    @discardableResult
+    public func waitUntilReady(timeout: TimeInterval = 180) async -> ProxyState {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if case .running = state { return state }
+            if case .failed = state { return state }
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
+        return state
     }
 
     private func startNow() async {

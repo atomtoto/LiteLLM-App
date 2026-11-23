@@ -53,6 +53,19 @@ public actor LiteLLMClient {
         }
     }
 
+    /// `POST /v1/chat/completions` minimal non streamé, pour valider qu'un modèle répond.
+    /// - Returns: le contenu de la réponse (attendu : « OK »).
+    public func testChatCompletion(model: String) async throws -> String {
+        let body = ChatCompletionRequest(
+            model: model,
+            messages: [ChatMessageDTO(role: "user", content: "Reply with exactly: OK")],
+            maxTokens: 16,
+            stream: false
+        )
+        let response = try await chatCompletion(request: body)
+        return response.choices.first?.message?.content.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+
     /// `POST /v1/chat/completions` en streaming (SSE).
     /// - Parameter onDelta: appelé pour chaque chunk reçu (peut être annulé via la tâche appelante).
     /// - Returns: l'usage total des tokens si le serveur l'a inclus (`stream_options.include_usage`).

@@ -28,12 +28,12 @@ final class ChatViewModel: ObservableObject {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !isStreaming else { return }
         guard !model.isEmpty else {
-            errorMessage = "Aucun modèle sélectionné. Choisissez-en un dans la barre d'outils ou définissez-en un par défaut dans les réglages."
+            errorMessage = L10n.shared.t("Aucun modèle sélectionné. Choisissez-en un dans la barre d'outils ou définissez-en un par défaut dans les réglages.")
             showError = true
             return
         }
         guard let client = settings.makeClient() else {
-            errorMessage = "URL du serveur invalide — vérifiez les réglages."
+            errorMessage = L10n.shared.t("URL du serveur invalide — vérifiez les réglages.")
             showError = true
             return
         }
@@ -94,7 +94,7 @@ final class ChatViewModel: ObservableObject {
                         self.errorMessage = error.localizedDescription
                         self.showError = true
                     } else {
-                        assistantMessage.content += "\n\n— *Erreur : \(error.localizedDescription)*"
+                        assistantMessage.content += L10n.shared.t("\n\n— *Erreur : %@*", error.localizedDescription)
                     }
                     self.save()
                 }

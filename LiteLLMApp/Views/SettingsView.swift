@@ -6,19 +6,32 @@ struct SettingsView: View {
     @State private var testMessage = ""
     @State private var testOK = false
 
+    private var t: (String) -> String { L10n.shared.t }
+
     var body: some View {
         Form {
-            Section("Serveur LiteLLM") {
-                TextField("URL du serveur", text: $settings.serverURL,
+            Section(t("Application")) {
+                Picker(t("Langue"), selection: Binding(
+                    get: { L10n.shared.lang },
+                    set: { L10n.shared.lang = $0 }
+                )) {
+                    ForEach(AppLanguage.allCases) { lang in
+                        Text(lang.displayName).tag(lang)
+                    }
+                }
+            }
+
+            Section(t("Serveur LiteLLM")) {
+                TextField(t("URL du serveur"), text: $settings.serverURL,
                           prompt: Text("http://localhost:4000"))
                     .textFieldStyle(.roundedBorder)
-                SecureField("Clé API", text: $settings.apiKey, prompt: Text("sk-…"))
+                SecureField(t("Clé API"), text: $settings.apiKey, prompt: Text("sk-…"))
                     .textFieldStyle(.roundedBorder)
                     .onChange(of: settings.apiKey) { _, _ in
                         settings.saveAPIKeyToKeychain()
                     }
                 HStack {
-                    Button("Tester la connexion") { Task { await testConnection() } }
+                    Button(t("Tester la connexion")) { Task { await testConnection() } }
                         .disabled(testing || settings.baseURL == nil)
                     if testing {
                         ProgressView().controlSize(.small)
@@ -32,34 +45,34 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Modèles") {
-                Picker("Modèle par défaut", selection: $settings.defaultModel) {
-                    Text("Aucun").tag("")
+            Section(t("Modèles")) {
+                Picker(t("Modèle par défaut"), selection: $settings.defaultModel) {
+                    Text(t("Aucun")).tag("")
                     ForEach(settings.availableModels, id: \.self) { model in
                         Text(model).tag(model)
                     }
                 }
-                Button("Actualiser depuis le serveur") { Task { await refreshModels() } }
+                Button(t("Actualiser depuis le serveur")) { Task { await refreshModels() } }
                     .disabled(settings.baseURL == nil)
                 if !settings.availableModels.isEmpty {
-                    Text("\(settings.availableModels.count) modèle(s) en cache")
+                    Text(L10n.shared.t("%@ modèle(s) en cache", settings.availableModels.count))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
 
-            Section("Génération") {
+            Section(t("Génération")) {
                 HStack {
-                    Text("Température")
+                    Text(t("Température"))
                     Slider(value: $settings.temperature, in: 0...2, step: 0.05)
                     Text(settings.temperature, format: .number.precision(.fractionLength(2)))
                         .frame(width: 44, alignment: .trailing)
                         .foregroundStyle(.secondary)
                 }
                 Stepper(value: $settings.maxTokens, in: 16...200_000, step: 256) {
-                    Text("Tokens max : \(settings.maxTokens)")
+                    Text(L10n.shared.t("Tokens max : %@", settings.maxTokens))
                 }
-                TextField("Invite système (optionnel)", text: $settings.systemPrompt, axis: .vertical)
+                TextField(t("Invite système (optionnel)"), text: $settings.systemPrompt, axis: .vertical)
                     .lineLimit(2...5)
             }
         }
@@ -74,7 +87,7 @@ struct SettingsView: View {
         defer { testing = false }
         guard let client = settings.makeClient() else {
             testOK = false
-            testMessage = "URL du serveur invalide."
+            testMessage = t("URL du serveur invalide.")
             return
         }
         do {
@@ -86,11 +99,11 @@ struct SettingsView: View {
             }
             testOK = true
             testMessage = healthy
-                ? "Connecté — \(models.count) modèle(s) disponible(s)."
-                : "\(models.count) modèle(s) — le health check a répondu hors plage 2xx."
+                ? L10n.shared.t("Connecté — %@ modèle(s) disponible(s).", models.count)
+                : L10n.shared.t("%@ modèle(s) — le health check a répondu hors plage 2xx.", models.count)
         } catch {
             testOK = false
-            testMessage = "Échec : \(error.localizedDescription)"
+            testMessage = L10n.shared.t("Échec : %@", error.localizedDescription)
         }
     }
 
@@ -104,7 +117,7 @@ struct SettingsView: View {
             }
         } catch {
             testOK = false
-            testMessage = "Échec : \(error.localizedDescription)"
+            testMessage = L10n.shared.t("Échec : %@", error.localizedDescription)
         }
     }
 }

@@ -3,16 +3,22 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 71;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		A11CE0000000000000000001 /* SSEParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11CE0000000000000000007 /* SSEParserTests.swift */; };
 		A11CE0000000000000000002 /* APIModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11CE0000000000000000008 /* APIModelsTests.swift */; };
 		A11CE0000000000000000003 /* ProxyConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11CE0000000000000000009 /* ProxyConfigTests.swift */; };
-		A11CE0000000000000000004 /* SSEParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11CE000000000000000000A /* SSEParser.swift */; };
-		A11CE0000000000000000005 /* APIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11CE000000000000000000B /* APIModels.swift */; };
-		A11CE0000000000000000006 /* ProxyConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11CE000000000000000000C /* ProxyConfig.swift */; };
+		A11CE0000000000000000004 /* ../LiteLLMApp/Models/SSEParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11CE000000000000000000A /* ../LiteLLMApp/Models/SSEParser.swift */; };
+		A11CE0000000000000000005 /* ../LiteLLMApp/Models/APIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11CE000000000000000000B /* ../LiteLLMApp/Models/APIModels.swift */; };
+		A11CE0000000000000000006 /* ../LiteLLMApp/Services/ProxyConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = A11CE000000000000000000C /* ../LiteLLMApp/Services/ProxyConfig.swift */; };
+		B22DF000000000000000001 /* ProviderPresetsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22DF000000000000000011 /* ProviderPresetsTests.swift */; };
+		B22DF000000000000000002 /* LocalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22DF000000000000000012 /* LocalizationTests.swift */; };
+		B22DF000000000000000003 /* ShareConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22DF000000000000000013 /* ShareConfigTests.swift */; };
+		B22DF000000000000000004 /* ../LiteLLMApp/Services/Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22DF000000000000000014 /* ../LiteLLMApp/Services/Localization.swift */; };
+		B22DF000000000000000005 /* ../LiteLLMApp/Services/ProviderPresets.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22DF000000000000000015 /* ../LiteLLMApp/Services/ProviderPresets.swift */; };
+		B22DF000000000000000006 /* ../LiteLLMApp/Services/ShareConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22DF000000000000000016 /* ../LiteLLMApp/Services/ShareConfig.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -25,8 +31,26 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXFileReference section */
+		A11CE0000000000000000007 /* SSEParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSEParserTests.swift; sourceTree = "<group>"; };
+		A11CE0000000000000000008 /* APIModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIModelsTests.swift; sourceTree = "<group>"; };
+		A11CE0000000000000000009 /* ProxyConfigTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyConfigTests.swift; sourceTree = "<group>"; };
+		A11CE000000000000000000A /* ../LiteLLMApp/Models/SSEParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../LiteLLMApp/Models/SSEParser.swift; sourceTree = "<group>"; };
+		A11CE000000000000000000B /* ../LiteLLMApp/Models/APIModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../LiteLLMApp/Models/APIModels.swift; sourceTree = "<group>"; };
+		A11CE000000000000000000C /* ../LiteLLMApp/Services/ProxyConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../LiteLLMApp/Services/ProxyConfig.swift; sourceTree = "<group>"; };
+		B22DF000000000000000011 /* ProviderPresetsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderPresetsTests.swift; sourceTree = "<group>"; };
+		B22DF000000000000000012 /* LocalizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationTests.swift; sourceTree = "<group>"; };
+		B22DF000000000000000013 /* ShareConfigTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareConfigTests.swift; sourceTree = "<group>"; };
+		B22DF000000000000000014 /* ../LiteLLMApp/Services/Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../LiteLLMApp/Services/Localization.swift; sourceTree = "<group>"; };
+		B22DF000000000000000015 /* ../LiteLLMApp/Services/ProviderPresets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../LiteLLMApp/Services/ProviderPresets.swift; sourceTree = "<group>"; };
+		B22DF000000000000000016 /* ../LiteLLMApp/Services/ShareConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../LiteLLMApp/Services/ShareConfig.swift; sourceTree = "<group>"; };
+		A11CE000000000000000000D /* LiteLLMApp/Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = LiteLLMApp/Info.plist; sourceTree = "<group>"; };
+		A11CE000000000000000000E /* LiteLLMApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LiteLLMApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A11CE000000000000000000F /* LiteLLMAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LiteLLMAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		A11CE000000000000000001C /* Exceptions for "LiteLLMApp" folder in "LiteLLMApp" target */ = {
+		A11CE000000000000000001C /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -35,27 +59,8 @@
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
-/* Begin PBXFileReference section */
-		A11CE0000000000000000007 /* SSEParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSEParserTests.swift; sourceTree = "<group>"; };
-		A11CE0000000000000000008 /* APIModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIModelsTests.swift; sourceTree = "<group>"; };
-		A11CE0000000000000000009 /* ProxyConfigTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProxyConfigTests.swift; sourceTree = "<group>"; };
-		A11CE000000000000000000A /* SSEParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../LiteLLMApp/Models/SSEParser.swift; sourceTree = "<group>"; };
-		A11CE000000000000000000B /* APIModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../LiteLLMApp/Models/APIModels.swift; sourceTree = "<group>"; };
-		A11CE000000000000000000C /* ProxyConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../LiteLLMApp/Services/ProxyConfig.swift; sourceTree = "<group>"; };
-		A11CE000000000000000000D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = LiteLLMApp/Info.plist; sourceTree = "<group>"; };
-		A11CE000000000000000000E /* LiteLLMApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LiteLLMApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A11CE000000000000000000F /* LiteLLMAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LiteLLMAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-/* End PBXFileReference section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		A11CE0000000000000000019 /* LiteLLMApp */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				A11CE000000000000000001C /* Exceptions for "LiteLLMApp" folder in "LiteLLMApp" target */,
-			);
-			path = LiteLLMApp;
-			sourceTree = "<group>";
-		};
+		A11CE0000000000000000019 /* LiteLLMApp */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (A11CE000000000000000001C /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = LiteLLMApp; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -76,13 +81,13 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		A11CE0000000000000000018 /* LiteLLMApp */ = {
+		A11CE0000000000000000018 = {
 			isa = PBXGroup;
 			children = (
 				A11CE0000000000000000019 /* LiteLLMApp */,
 				A11CE000000000000000001A /* LiteLLMAppTests */,
 				A11CE000000000000000001B /* Products */,
-				A11CE000000000000000000D /* Info.plist */,
+				A11CE000000000000000000D /* LiteLLMApp/Info.plist */,
 			);
 			sourceTree = "<group>";
 		};
@@ -92,9 +97,15 @@
 				A11CE0000000000000000007 /* SSEParserTests.swift */,
 				A11CE0000000000000000008 /* APIModelsTests.swift */,
 				A11CE0000000000000000009 /* ProxyConfigTests.swift */,
-				A11CE000000000000000000A /* SSEParser.swift */,
-				A11CE000000000000000000B /* APIModels.swift */,
-				A11CE000000000000000000C /* ProxyConfig.swift */,
+				A11CE000000000000000000A /* ../LiteLLMApp/Models/SSEParser.swift */,
+				A11CE000000000000000000B /* ../LiteLLMApp/Models/APIModels.swift */,
+				A11CE000000000000000000C /* ../LiteLLMApp/Services/ProxyConfig.swift */,
+				B22DF000000000000000011 /* ProviderPresetsTests.swift */,
+				B22DF000000000000000012 /* LocalizationTests.swift */,
+				B22DF000000000000000013 /* ShareConfigTests.swift */,
+				B22DF000000000000000014 /* ../LiteLLMApp/Services/Localization.swift */,
+				B22DF000000000000000015 /* ../LiteLLMApp/Services/ProviderPresets.swift */,
+				B22DF000000000000000016 /* ../LiteLLMApp/Services/ShareConfig.swift */,
 			);
 			path = LiteLLMAppTests;
 			sourceTree = "<group>";
@@ -175,7 +186,7 @@
 				fr,
 				en,
 			);
-			mainGroup = A11CE0000000000000000018 /* LiteLLMApp */;
+			mainGroup = A11CE0000000000000000018;
 			productRefGroup = A11CE000000000000000001B /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -218,9 +229,15 @@
 				A11CE0000000000000000001 /* SSEParserTests.swift in Sources */,
 				A11CE0000000000000000002 /* APIModelsTests.swift in Sources */,
 				A11CE0000000000000000003 /* ProxyConfigTests.swift in Sources */,
-				A11CE0000000000000000004 /* SSEParser.swift in Sources */,
-				A11CE0000000000000000005 /* APIModels.swift in Sources */,
-				A11CE0000000000000000006 /* ProxyConfig.swift in Sources */,
+				A11CE0000000000000000004 /* ../LiteLLMApp/Models/SSEParser.swift in Sources */,
+				A11CE0000000000000000005 /* ../LiteLLMApp/Models/APIModels.swift in Sources */,
+				A11CE0000000000000000006 /* ../LiteLLMApp/Services/ProxyConfig.swift in Sources */,
+				B22DF000000000000000001 /* ProviderPresetsTests.swift in Sources */,
+				B22DF000000000000000002 /* LocalizationTests.swift in Sources */,
+				B22DF000000000000000003 /* ShareConfigTests.swift in Sources */,
+				B22DF000000000000000004 /* ../LiteLLMApp/Services/Localization.swift in Sources */,
+				B22DF000000000000000005 /* ../LiteLLMApp/Services/ProviderPresets.swift in Sources */,
+				B22DF000000000000000006 /* ../LiteLLMApp/Services/ShareConfig.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -238,11 +255,6 @@
 		A11CE0000000000000000020 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				SDKROOT = macosx;
-				SUPPORTED_PLATFORMS = macosx;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
@@ -250,29 +262,37 @@
 				ENABLE_TESTABILITY = YES;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_OPTIMIZATION_LEVEL = 0;
-				GCC_PREPROCESSOR_DEFINITIONS = ("DEBUG=1", "$(inherited)");
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
 		};
 		A11CE0000000000000000021 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				SDKROOT = macosx;
-				SUPPORTED_PLATFORMS = macosx;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				COPY_PHASE_STRIP = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = NO;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
@@ -284,13 +304,16 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LiteLLMApp/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/../Frameworks");
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
 				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.litellm.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				DEBUG_INFORMATION_FORMAT = dwarf;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
 			name = Debug;
@@ -302,13 +325,16 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LiteLLMApp/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/../Frameworks");
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
 				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.litellm.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				VALIDATE_PRODUCT = YES;
 			};
@@ -319,12 +345,12 @@
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.litellm.app.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
-				DEBUG_INFORMATION_FORMAT = dwarf;
-				ENABLE_TESTABILITY = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
 			name = Debug;
@@ -334,11 +360,11 @@
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				GENERATE_INFOPLIST_FILE = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.litellm.app.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 			};
 			name = Release;
@@ -346,7 +372,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		A11CE000000000000000001D /* Build configuration list */ = {
+		A11CE000000000000000001D /* Build configuration list for PBXProject "LiteLLMApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A11CE0000000000000000020 /* Debug */,
@@ -355,7 +381,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		A11CE000000000000000001E /* Build configuration list */ = {
+		A11CE000000000000000001E /* Build configuration list for PBXNativeTarget "LiteLLMApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A11CE0000000000000000022 /* Debug */,
@@ -364,7 +390,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		A11CE000000000000000001F /* Build configuration list */ = {
+		A11CE000000000000000001F /* Build configuration list for PBXNativeTarget "LiteLLMAppTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A11CE0000000000000000024 /* Debug */,
