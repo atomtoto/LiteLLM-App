@@ -40,7 +40,7 @@ struct ProxyView: View {
         case .notInstalled: return "Non installé"
         case .installing: return "Installation en cours…"
         case .installed: return "Installé (arrêté)"
-        case .starting: return "Démarrage…"
+        case .starting: return "Démarrage… (premier lancement : ~10–30 s)"
         case .running(let external): return external ? "En cours (démarré hors de l'app)" : "En cours d'exécution"
         case .stopping: return "Arrêt en cours…"
         case .failed(let message): return "Erreur : \(message)"
@@ -82,13 +82,13 @@ struct ProxyView: View {
                         Button("Installer LiteLLM") { proxy.install() }
                             .disabled(proxy.isBusy)
                     }
-                    if proxy.isInstalled, !proxy.isRunning {
+                    if proxy.isInstalled, !proxy.isRunning, !proxy.canStop {
                         Button("Démarrer") { proxy.start() }
                             .disabled(proxy.isBusy)
                     }
-                    if case .running(let external) = proxy.state, !external {
+                    if proxy.canStop {
                         Button("Arrêter", role: .destructive) { proxy.stop() }
-                            .disabled(proxy.isBusy)
+                            .disabled(proxy.isStopping)
                     }
                     if proxy.isBusy { ProgressView().controlSize(.small) }
                     Spacer()

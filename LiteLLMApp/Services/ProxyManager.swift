@@ -16,6 +16,12 @@ public enum ProxyState: Equatable, Sendable {
     case failed(String)
 }
 
+/// Journal cible pour la sortie des process.
+public enum LogKind: Sendable {
+    case install
+    case proxy
+}
+
 /// Gère l'installation, le démarrage, l'arrêt et la configuration du proxy LiteLLM local.
 @MainActor
 public final class ProxyManager: ObservableObject {
@@ -23,10 +29,12 @@ public final class ProxyManager: ObservableObject {
     @Published public var installLog = ""
     @Published public var proxyLog = ""
     @Published public var isHealthy = false
+    @Published public var isStopping = false
     @Published public var settings = ProxySettingsStore.load()
 
     private let appSupport: URL
     private var process: Process?
+    private var adoptedPID: Int32?
     private var healthTask: Task<Void, Never>?
     private var installTask: Task<Void, Never>?
 
@@ -49,6 +57,7 @@ public final class ProxyManager: ObservableObject {
     private var pipBinary: URL { venvDir.appendingPathComponent("bin/pip") }
     private var configFile: URL { appSupport.appendingPathComponent("config.yaml") }
     private var settingsFile: URL { appSupport.appendingPathComponent("proxy-settings.json") }
+    private var pidFile: URL { appSupport.appendingPathComponent("proxy.pid") }
 
     public var isInstalled: Bool {
         FileManager.default.isExecutableFile(atPath: litellmBinary.path)
@@ -60,7 +69,7 @@ public final class ProxyManager: ObservableObject {
 
     // MARK: - Master key
 
-    /// Master key du proxy : lu du trousseau, ou généré et stocké la première fois.
+    /// Master key du proxy : lue du trousseau, ou générée et stockée la première fois.
     public func masterKey() -> String {
         if let key = KeychainService.load(account: KeychainService.masterKeyAccount), !key.isEmpty {
             return key
@@ -92,6 +101,14 @@ public final class ProxyManager: ObservableObject {
 
     public var isRunning: Bool {
         if case .running = state { return true }
+        return false
+    }
+
+    /// Vrai si l'on peut arrêter le proxy (process lancé par l'app, ou pid adopté encore vivant).
+    public var canStop: Bool {
+        if isStopping { return false }
+        if let p = process, p.isRunning { return true }
+        if let pid = adoptedPID, kill(pid, 0) == 0 { return true }
         return false
     }
 
@@ -154,10 +171,12 @@ public final class ProxyManager: ObservableObject {
 
     private func startNow() async {
         // Un proxy répond déjà sur ce port ?
-        if await checkHealth() {
-            state = .running(external: true)
-            isHealthy = true
-            appendProxy("Un proxy répond déjà sur \(settings.host):\(settings.port) — réutilisé.\n")
+        if await serverResponds() {
+            adoptedPID = readPIDFile()
+            state = .running(external: adoptedPID == nil)
+            isHealthy = await checkHealth()
+            appendProxy("Un proxy répond déjà sur \(settings.host):\(settings.port)"
+                        + (adoptedPID != nil ? " — pid \(adoptedPID!) adopté (arrêtable)." : " — démarré hors de l'app.") + "\n")
             startHealthPolling()
             return
         }
@@ -196,16 +215,17 @@ public final class ProxyManager: ObservableObject {
         process.terminationHandler = { [weak self] p in
             Task { @MainActor in
                 guard let self else { return }
+                self.removePIDFile()
                 self.appendProxy("\n[processus terminé, code \(p.terminationStatus)]\n")
-                if case .running = self.state {
-                    if await self.checkHealth() {
+                if case .running = self.state, self.process === p {
+                    if await self.serverResponds() {
                         self.state = .running(external: true)
                     } else {
                         self.state = .installed
                         self.isHealthy = false
                     }
-                } else if case .starting = self.state {
-                    self.state = .failed("Le proxy s'est arrêté au démarrage (code \(p.terminationStatus)). Voir le journal.")
+                } else if case .starting = self.state, self.process === p {
+                    self.state = .failed("Le proxy s'est arrêté au démarrage (code \(p.terminationStatus)) — voir le journal.")
                     self.isHealthy = false
                 }
             }
@@ -213,6 +233,7 @@ public final class ProxyManager: ObservableObject {
         do {
             try process.run()
             self.process = process
+            writePIDFile(Int32(process.processIdentifier))
         } catch {
             state = .failed("Lancement impossible : \(error.localizedDescription)")
             return
@@ -221,56 +242,123 @@ public final class ProxyManager: ObservableObject {
     }
 
     public func stop() {
-        guard !isBusy, case .running(external: false) = state, let process else { return }
-        state = .stopping
-        process.terminate()
-        Task { [weak self] in
-            guard let self else { return }
-            let deadline = Date().addingTimeInterval(5)
-            while process.isRunning && Date() < deadline {
-                try? await Task.sleep(nanoseconds: 100_000_000)
+        guard !isStopping else { return }
+        if let p = process, p.isRunning {
+            isStopping = true
+            state = .stopping
+            p.terminate()
+            Task { [weak self] in
+                guard let self else { return }
+                let deadline = Date().addingTimeInterval(5)
+                while p.isRunning && Date() < deadline {
+                    try? await Task.sleep(nanoseconds: 100_000_000)
+                }
+                if p.isRunning { kill(p.processIdentifier, SIGKILL) }
+                await self.finishStop()
             }
-            if process.isRunning { kill(process.processIdentifier, SIGKILL) }
-            healthTask?.cancel()
-            self.process = nil
-            isHealthy = false
-            state = .installed
-            appendProxy("[arrêté]\n")
+        } else if let pid = adoptedPID, kill(pid, 0) == 0 {
+            isStopping = true
+            state = .stopping
+            Task { [weak self] in
+                guard let self else { return }
+                kill(pid, SIGTERM)
+                let deadline = Date().addingTimeInterval(5)
+                while kill(pid, 0) == 0 && Date() < deadline {
+                    try? await Task.sleep(nanoseconds: 100_000_000)
+                }
+                if kill(pid, 0) == 0 { kill(pid, SIGKILL) }
+                await self.finishStop()
+            }
         }
     }
 
+    private func finishStop() async {
+        healthTask?.cancel()
+        process = nil
+        adoptedPID = nil
+        removePIDFile()
+        isHealthy = false
+        isStopping = false
+        state = .installed
+        appendProxy("[arrêté]\n")
+    }
+
     @objc private func appWillTerminate() {
-        guard settings.stopOnQuit, let process, process.isRunning else { return }
-        process.terminate()
-        let deadline = Date().addingTimeInterval(3)
-        while process.isRunning && Date() < deadline { usleep(100_000) }
-        if process.isRunning { kill(process.processIdentifier, SIGKILL) }
+        guard settings.stopOnQuit else { return }
+        if let p = process, p.isRunning {
+            p.terminate()
+            let deadline = Date().addingTimeInterval(3)
+            while p.isRunning && Date() < deadline { usleep(100_000) }
+            if p.isRunning { kill(p.processIdentifier, SIGKILL) }
+        } else if let pid = adoptedPID, kill(pid, 0) == 0 {
+            kill(pid, SIGTERM)
+            let deadline = Date().addingTimeInterval(3)
+            while kill(pid, 0) == 0 && Date() < deadline { usleep(100_000) }
+            if kill(pid, 0) == 0 { kill(pid, SIGKILL) }
+        }
     }
 
     // MARK: - Santé
 
+    /// Vrai si `/health` répond 2xx **avec la master key** (badge « health OK »).
     public func checkHealth() async -> Bool {
         guard let url = baseURL?.appendingPathComponent("health") else { return false }
         var request = URLRequest(url: url)
         request.timeoutInterval = 3
+        let key = masterKey()
+        if !key.isEmpty {
+            request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        }
         guard let (_, response) = try? await URLSession.shared.data(for: request),
               let http = response as? HTTPURLResponse else { return false }
         return (200..<300).contains(http.statusCode)
     }
 
+    /// Vrai si le port répond en HTTP (n'importe quel statut) : détecte un serveur en ligne,
+    /// même pendant le démarrage ou si `/health` exige une clé (401 sans master key).
+    public func serverResponds() async -> Bool {
+        guard let url = baseURL?.appendingPathComponent("health/liveliness") else { return false }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 2
+        guard let (_, response) = try? await URLSession.shared.data(for: request),
+              response is HTTPURLResponse else { return false }
+        return true
+    }
+
     private func startHealthPolling() {
         healthTask?.cancel()
         healthTask = Task { [weak self] in
-            while let self, !Task.isCancelled {
-                let ok = await self.checkHealth()
-                self.isHealthy = ok
-                if ok, case .starting = self.state {
-                    self.state = .running(external: false)
-                    self.appendProxy("[prêt — /health OK]\n")
+            guard let self else { return }
+            let startedAt = Date()
+            while !Task.isCancelled {
+                if await self.serverResponds() {
+                    self.isHealthy = await self.checkHealth()
+                    if case .starting = self.state {
+                        self.state = .running(external: false)
+                        self.appendProxy("[prêt — le serveur répond]\n")
+                    }
+                } else if case .starting = self.state, Date().timeIntervalSince(startedAt) > 120 {
+                    self.state = .failed("Le proxy ne répond pas après 120 s — voir le journal ci-dessous.")
                 }
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
             }
         }
+    }
+
+    // MARK: - Fichier pid
+
+    private func writePIDFile(_ pid: Int32) {
+        try? String(pid).write(to: pidFile, atomically: true, encoding: .utf8)
+    }
+
+    private func readPIDFile() -> Int32? {
+        guard let text = try? String(contentsOf: pidFile, encoding: .utf8),
+              let pid = Int32(text.trimmingCharacters(in: .whitespacesAndNewlines)) else { return nil }
+        return kill(pid, 0) == 0 ? pid : nil
+    }
+
+    private func removePIDFile() {
+        try? FileManager.default.removeItem(at: pidFile)
     }
 
     // MARK: - Réglages
@@ -331,12 +419,6 @@ public final class ProxyManager: ObservableObject {
         proxyLog += text
         if proxyLog.count > 200_000 { proxyLog = String(proxyLog.suffix(100_000)) }
     }
-}
-
-/// Journal cible pour la sortie des process.
-public enum LogKind: Sendable {
-    case install
-    case proxy
 }
 
 public enum ProxyError: Error, LocalizedError, Sendable {
