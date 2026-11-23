@@ -1,12 +1,14 @@
 import Foundation
 import Security
 
-/// Stockage sécurisé de la clé API dans le trousseau macOS.
+/// Stockage sécurisé dans le trousseau macOS.
 public enum KeychainService: Sendable {
     private static let service = "com.litellm.app"
-    private static let account = "litellm-api-key"
 
-    public static func saveAPIKey(_ key: String) throws {
+    public static let apiKeyAccount = "litellm-api-key"
+    public static let masterKeyAccount = "litellm-master-key"
+
+    public static func save(account: String, value: String) throws {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -14,14 +16,14 @@ public enum KeychainService: Sendable {
         ]
         SecItemDelete(query as CFDictionary)
         let attributes: [String: Any] = query.merging([
-            kSecValueData as String: Data(key.utf8),
+            kSecValueData as String: Data(value.utf8),
             kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked,
         ]) { _, new in new }
         let status = SecItemAdd(attributes as CFDictionary, nil)
         guard status == errSecSuccess else { throw KeychainError.unexpectedStatus(status) }
     }
 
-    public static func loadAPIKey() -> String? {
+    public static func load(account: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -35,7 +37,7 @@ public enum KeychainService: Sendable {
         return String(data: data, encoding: .utf8)
     }
 
-    public static func deleteAPIKey() throws {
+    public static func delete(account: String) throws {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -46,6 +48,15 @@ public enum KeychainService: Sendable {
             throw KeychainError.unexpectedStatus(status)
         }
     }
+
+    // MARK: - Clés pratiques
+
+    public static func saveAPIKey(_ key: String) throws { try save(account: apiKeyAccount, value: key) }
+    public static func loadAPIKey() -> String? { load(account: apiKeyAccount) }
+    public static func deleteAPIKey() throws { try delete(account: apiKeyAccount) }
+
+    public static func saveMasterKey(_ key: String) throws { try save(account: masterKeyAccount, value: key) }
+    public static func loadMasterKey() -> String? { load(account: masterKeyAccount) }
 }
 
 public enum KeychainError: Error, LocalizedError, Sendable {

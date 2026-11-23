@@ -4,10 +4,12 @@ import SwiftData
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var settings: AppSettings
+    @EnvironmentObject private var proxy: ProxyManager
     @Environment(\.openSettings) private var openSettings
     @Query(sort: \Conversation.updatedAt, order: .reverse) private var conversations: [Conversation]
     @State private var selection: UUID?
     @State private var showModels = false
+    @State private var showProxy = false
 
     var body: some View {
         NavigationSplitView {
@@ -44,6 +46,17 @@ struct ContentView: View {
                     .help("Modèles disponibles sur le serveur")
                 }
                 ToolbarItem(placement: .navigation) {
+                    Button { showProxy = true } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "cpu")
+                            if case .running = proxy.state {
+                                Circle().fill(.green).frame(width: 7, height: 7)
+                            }
+                        }
+                    }
+                    .help("Gérer le proxy LiteLLM local (installation, démarrage, configuration)")
+                }
+                ToolbarItem(placement: .navigation) {
                     Button { openSettings() } label: {
                         Image(systemName: "gear")
                     }
@@ -65,6 +78,14 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showModels) {
             ModelsView()
+        }
+        .sheet(isPresented: $showProxy) {
+            ProxyView()
+                .environmentObject(settings)
+                .environmentObject(proxy)
+        }
+        .task {
+            proxy.autoStartIfNeeded()
         }
     }
 

@@ -15,7 +15,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "A11CE000000000000000000C"
+               BlueprintIdentifier = "A11CE0000000000000000010"
                BuildableName = "LiteLLMApp.app"
                BlueprintName = "LiteLLMApp"
                ReferencedContainer = "container:LiteLLMApp.xcodeproj">
@@ -29,7 +29,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "A11CE000000000000000000D"
+               BlueprintIdentifier = "A11CE0000000000000000011"
                BuildableName = "LiteLLMAppTests.xctest"
                BlueprintName = "LiteLLMAppTests"
                ReferencedContainer = "container:LiteLLMApp.xcodeproj">
@@ -47,7 +47,7 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "A11CE000000000000000000D"
+               BlueprintIdentifier = "A11CE0000000000000000011"
                BuildableName = "LiteLLMAppTests.xctest"
                BlueprintName = "LiteLLMAppTests"
                ReferencedContainer = "container:LiteLLMApp.xcodeproj">
@@ -69,7 +69,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "A11CE000000000000000000C"
+            BlueprintIdentifier = "A11CE0000000000000000010"
             BuildableName = "LiteLLMApp.app"
             BlueprintName = "LiteLLMApp"
             ReferencedContainer = "container:LiteLLMApp.xcodeproj">
@@ -86,7 +86,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "A11CE000000000000000000C"
+            BlueprintIdentifier = "A11CE0000000000000000010"
             BuildableName = "LiteLLMApp.app"
             BlueprintName = "LiteLLMApp"
             ReferencedContainer = "container:LiteLLMApp.xcodeproj">
