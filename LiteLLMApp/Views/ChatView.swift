@@ -205,18 +205,24 @@ struct GenerationSettingsForm: View {
     var body: some View {
         Form {
             Section {
-                LabeledContent {
-                    Slider(value: $settings.temperature, in: 0...2, step: 0.1) {
+                Toggle(isOn: $settings.customTemperature) {
+                    Text(t("Régler la créativité"))
+                    Text(t("Désactivé : le modèle choisit lui-même (recommandé)."))
+                }
+                if settings.customTemperature {
+                    LabeledContent {
+                        Slider(value: $settings.temperature, in: 0...2, step: 0.1) {
+                            Text(t("Créativité"))
+                        } minimumValueLabel: {
+                            Text(t("Précis"))
+                        } maximumValueLabel: {
+                            Text(t("Créatif"))
+                        }
+                        .labelsHidden()
+                    } label: {
                         Text(t("Créativité"))
-                    } minimumValueLabel: {
-                        Text(t("Précis"))
-                    } maximumValueLabel: {
-                        Text(t("Créatif"))
+                        Text(L10n.shared.t("Température : %@", settings.temperature.formatted(.number.precision(.fractionLength(1)))))
                     }
-                    .labelsHidden()
-                } label: {
-                    Text(t("Créativité"))
-                    Text(L10n.shared.t("Température : %@", settings.temperature.formatted(.number.precision(.fractionLength(1)))))
                 }
                 Toggle(t("Limiter la longueur des réponses"), isOn: limitBinding)
                 if settings.maxTokens > 0 {

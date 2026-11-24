@@ -74,6 +74,25 @@ public struct ChatCompletionRequest: Encodable, Sendable {
     }
 }
 
+extension ChatCompletionRequest {
+    /// Certains modèles récents refusent des paramètres de réglage (ex. Claude : « `temperature`
+    /// is deprecated for this model »). Si l'erreur nomme un paramètre facultatif présent dans la
+    /// requête, renvoie la requête sans lui pour la réessayer ; sinon nil.
+    public func removingParametersRejected(by error: Error) -> ChatCompletionRequest? {
+        guard let error = error as? LiteLLMError,
+              case .httpError(let status, let message) = error, status == 400 else { return nil }
+        let text = message.lowercased()
+        let complaint = ["deprecated", "not supported", "unsupported", "does not support", "not allowed", "invalid"]
+        guard complaint.contains(where: text.contains) else { return nil }
+        var copy = self
+        var changed = false
+        if temperature != nil, text.contains("temperature") { copy.temperature = nil; changed = true }
+        if topP != nil, text.contains("top_p") { copy.topP = nil; changed = true }
+        if maxTokens != nil, text.contains("max_tokens") { copy.maxTokens = nil; changed = true }
+        return changed ? copy : nil
+    }
+}
+
 public struct Usage: Decodable, Sendable, Equatable {
     public let promptTokens: Int?
     public let completionTokens: Int?

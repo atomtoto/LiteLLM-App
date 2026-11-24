@@ -114,7 +114,7 @@ final class ChatViewModel {
         let request = ChatCompletionRequest(
             model: model,
             messages: dtos,
-            temperature: settings.temperature,
+            temperature: settings.customTemperature ? settings.temperature : nil,
             maxTokens: settings.maxTokens > 0 ? settings.maxTokens : nil,
             stream: true
         )
@@ -124,8 +124,17 @@ final class ChatViewModel {
         streamTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let usage = try await client.streamChatCompletion(request: request) { chunk in
+                let onChunk: @Sendable (ChatCompletionChunk) async -> Void = { chunk in
                     await self.apply(chunk: chunk)
+                }
+                let usage: Usage?
+                do {
+                    usage = try await client.streamChatCompletion(request: request, onDelta: onChunk)
+                } catch {
+                    // Le modèle refuse un réglage (ex. la température) : on réessaie sans lui.
+                    guard assistantMessage.content.isEmpty,
+                          let retry = request.removingParametersRejected(by: error) else { throw error }
+                    usage = try await client.streamChatCompletion(request: retry, onDelta: onChunk)
                 }
                 assistantMessage.tokenUsage = usage?.totalTokens
                 self.finishStreaming()

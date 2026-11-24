@@ -100,4 +100,23 @@ final class APIModelsTests: XCTestCase {
         let message = FriendlyError.message(for: URLError(.cannotConnectToHost), l10n: l10n)
         XCTAssertTrue(message.contains("Could not reach the server"))
     }
+
+    func testRetryDropsTemperatureRejectedByModel() {
+        let request = ChatCompletionRequest(model: "claude-opus-5-5", messages: [],
+                                            temperature: 0.7, maxTokens: 1024, stream: true)
+        let error = LiteLLMError.httpError(status: 400, message: "AnthropicException - `temperature` is deprecated for this model.")
+        let retry = request.removingParametersRejected(by: error)
+        XCTAssertNotNil(retry)
+        XCTAssertNil(retry?.temperature)
+        XCTAssertEqual(retry?.maxTokens, 1024)
+    }
+
+    func testNoRetryForUnrelatedErrors() {
+        let request = ChatCompletionRequest(model: "m", messages: [], temperature: 0.7)
+        XCTAssertNil(request.removingParametersRejected(by: LiteLLMError.httpError(status: 401, message: "temperature invalid")))
+        XCTAssertNil(request.removingParametersRejected(by: LiteLLMError.httpError(status: 400, message: "Invalid model name")))
+        // Rien à retirer : la requête n'a pas de température.
+        let bare = ChatCompletionRequest(model: "m", messages: [])
+        XCTAssertNil(bare.removingParametersRejected(by: LiteLLMError.httpError(status: 400, message: "`temperature` is deprecated")))
+    }
 }

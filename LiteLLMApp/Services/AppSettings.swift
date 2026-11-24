@@ -9,6 +9,7 @@ public final class AppSettings: ObservableObject {
         static let serverURL = "serverURL"
         static let defaultModel = "defaultModel"
         static let temperature = "temperature"
+        static let customTemperature = "customTemperature"
         static let maxTokens = "maxTokens"
         static let systemPrompt = "systemPrompt"
         static let availableModels = "availableModels"
@@ -26,6 +27,10 @@ public final class AppSettings: ObservableObject {
         didSet { Self.defaults.set(temperature, forKey: Keys.temperature) }
     }
     /// 0 = pas de limite (le fournisseur choisit).
+    /// Faux = « Automatique » : la température n'est pas envoyée (certains modèles la refusent).
+    @Published public var customTemperature: Bool {
+        didSet { Self.defaults.set(customTemperature, forKey: Keys.customTemperature) }
+    }
     @Published public var maxTokens: Int {
         didSet { Self.defaults.set(maxTokens, forKey: Keys.maxTokens) }
     }
@@ -41,6 +46,7 @@ public final class AppSettings: ObservableObject {
         self.serverURL = d.string(forKey: Keys.serverURL) ?? "http://localhost:4000"
         self.defaultModel = d.string(forKey: Keys.defaultModel) ?? ""
         self.temperature = d.object(forKey: Keys.temperature) as? Double ?? 0.7
+        self.customTemperature = d.bool(forKey: Keys.customTemperature)
         self.maxTokens = d.object(forKey: Keys.maxTokens) as? Int ?? 0
         self.systemPrompt = d.string(forKey: Keys.systemPrompt) ?? ""
         self.availableModels = d.array(forKey: Keys.availableModels) as? [String] ?? []
