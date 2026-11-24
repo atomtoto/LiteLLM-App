@@ -31,12 +31,16 @@ public final class ProxyManager: ObservableObject {
     @Published public var isHealthy = false
     @Published public var isStopping = false
     @Published public var settings = ProxySettingsStore.load()
+    /// Vrai quand les réglages ont changé depuis le démarrage : un redémarrage est nécessaire.
+    @Published public private(set) var needsRestart = false
 
     private let appSupport: URL
     private var process: Process?
     private var adoptedPID: Int32?
     private var healthTask: Task<Void, Never>?
     private var installTask: Task<Void, Never>?
+    /// Réglages utilisés au dernier démarrage (pour détecter `needsRestart`).
+    private var startedSettings: ProxySettingsData?
 
     public init(appSupport: URL? = nil) {
         self.appSupport = appSupport ?? ProxyPaths.appSupport()
@@ -78,6 +82,16 @@ public final class ProxyManager: ObservableObject {
         _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
         let key = "sk-" + bytes.map { String(format: "%02x", $0) }.joined()
         try? KeychainService.save(account: KeychainService.masterKeyAccount, value: key)
+        return key
+    }
+
+    /// Génère une nouvelle master key, la stocke, et redémarre le proxy s'il tourne
+    /// (l'ancienne clé cesse alors de fonctionner). Renvoie la nouvelle clé.
+    @discardableResult
+    public func regenerateMasterKey() -> String {
+        try? KeychainService.delete(account: KeychainService.masterKeyAccount)
+        let key = masterKey()
+        if canStop { restart() }
         return key
     }
 
@@ -137,33 +151,64 @@ public final class ProxyManager: ObservableObject {
         installLog = ""
         do {
             let python = try Self.findPython()
-            appendInstall("Création du venv avec \(python.path)…\n")
+            appendInstall(L10n.shared.t("Création de l'environnement Python avec %@…", python.path) + "\n")
             _ = try await runProcess(executable: python, arguments: ["-m", "venv", venvDir.path],
                                      log: .install)
             guard FileManager.default.fileExists(atPath: pipBinary.path) else {
                 throw ProxyError.venvCreationFailed
             }
-            appendInstall("Installation de litellm[proxy] (cela peut prendre quelques minutes)…\n")
+            appendInstall(L10n.shared.t("Installation de litellm[proxy] (cela peut prendre quelques minutes)…") + "\n")
             let status = try await runProcess(executable: pipBinary,
                                               arguments: ["install", "--upgrade", "litellm[proxy]"],
                                               log: .install)
             guard status == 0, isInstalled else {
                 throw ProxyError.pipInstallFailed(status)
             }
-            appendInstall("Installation terminée.\n")
+            appendInstall(L10n.shared.t("Installation terminée.") + "\n")
             state = .installed
         } catch {
-            appendInstall("\nERREUR : \(error.localizedDescription)\n")
+            appendInstall("\n" + L10n.shared.t("ERREUR : %@", error.localizedDescription) + "\n")
             state = .failed(error.localizedDescription)
         }
     }
 
+    /// Trouve un Python 3 utilisable. `/usr/bin/python3` n'est qu'un raccourci tant que les
+    /// outils de ligne de commande Apple ne sont pas installés : on ne le retient que s'ils le sont.
     static func findPython() throws -> URL {
-        let candidates = ["/usr/bin/python3", "/opt/homebrew/bin/python3", "/usr/local/bin/python3", "/usr/bin/python"]
+        let candidates = ["/opt/homebrew/bin/python3", "/usr/local/bin/python3",
+                          "/Library/Frameworks/Python.framework/Versions/Current/bin/python3"]
         for path in candidates where FileManager.default.isExecutableFile(atPath: path) {
             return URL(fileURLWithPath: path)
         }
-        return URL(fileURLWithPath: "/usr/bin/env")
+        if hasCommandLineTools, FileManager.default.isExecutableFile(atPath: "/usr/bin/python3") {
+            return URL(fileURLWithPath: "/usr/bin/python3")
+        }
+        throw ProxyError.pythonMissing
+    }
+
+    /// Vrai si les outils de ligne de commande (ou Xcode) sont installés.
+    static var hasCommandLineTools: Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcode-select")
+        process.arguments = ["-p"]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        guard (try? process.run()) != nil else { return false }
+        process.waitUntilExit()
+        return process.terminationStatus == 0
+    }
+
+    /// Ouvre l'installateur Apple des outils de ligne de commande (fournit Python 3).
+    public func installCommandLineTools() {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcode-select")
+        process.arguments = ["--install"]
+        try? process.run()
+    }
+
+    /// Vrai si la dernière erreur vient de l'absence de Python.
+    public var isMissingPython: Bool {
+        state == .failed(ProxyError.pythonMissing.localizedDescription)
     }
 
     // MARK: - Démarrage / arrêt
@@ -173,6 +218,16 @@ public final class ProxyManager: ObservableObject {
         guard !isBusy, isInstalled else { return }
         Task { [weak self] in
             guard let self else { return }
+            await self.startNow()
+        }
+    }
+
+    /// Arrête puis relance le proxy (pour appliquer de nouveaux réglages).
+    public func restart() {
+        guard canStop else { start(); return }
+        Task { [weak self] in
+            guard let self else { return }
+            await self.stopAndWait()
             await self.startNow()
         }
     }
@@ -216,11 +271,13 @@ public final class ProxyManager: ObservableObject {
         do {
             _ = try ProxyConfigWriter.write(settings: settings, masterKey: masterKey(), to: configFile)
         } catch {
-            state = .failed("Écriture du config.yaml : \(error.localizedDescription)")
+            state = .failed(L10n.shared.t("Écriture du config.yaml : %@", error.localizedDescription))
             return
         }
 
         state = .starting
+        startedSettings = settings
+        needsRestart = false
         proxyLog = ""
         appendProxy("Démarrage : \(litellmBinary.path) --config \(configFile.path) --port \(settings.port) --host \(settings.host)\n")
 
@@ -258,7 +315,7 @@ public final class ProxyManager: ObservableObject {
                         self.isHealthy = false
                     }
                 } else if case .starting = self.state, self.process === p {
-                    self.state = .failed("Le proxy s'est arrêté au démarrage (code \(p.terminationStatus)) — voir le journal.")
+                    self.state = .failed(L10n.shared.t("Le service s'est arrêté pendant le démarrage (code %@). Consultez le journal technique.", p.terminationStatus))
                     self.isHealthy = false
                 }
             }
@@ -268,10 +325,18 @@ public final class ProxyManager: ObservableObject {
             self.process = process
             writePIDFile(Int32(process.processIdentifier))
         } catch {
-            state = .failed("Lancement impossible : \(error.localizedDescription)")
+            state = .failed(L10n.shared.t("Lancement impossible : %@", error.localizedDescription))
             return
         }
         startHealthPolling()
+    }
+
+    /// Arrête le proxy et attend la fin de l'arrêt.
+    public func stopAndWait() async {
+        stop()
+        while isStopping {
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
     }
 
     public func stop() {
@@ -313,6 +378,7 @@ public final class ProxyManager: ObservableObject {
         isHealthy = false
         isStopping = false
         state = .installed
+        needsRestart = false
         appendProxy("[arrêté]\n")
     }
 
@@ -371,7 +437,7 @@ public final class ProxyManager: ObservableObject {
                         self.appendProxy("[prêt — le serveur répond]\n")
                     }
                 } else if case .starting = self.state, Date().timeIntervalSince(startedAt) > 120 {
-                    self.state = .failed("Le proxy ne répond pas après 120 s — voir le journal ci-dessous.")
+                    self.state = .failed(L10n.shared.t("Le service ne répond pas après 120 s. Consultez le journal technique."))
                 }
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
             }
@@ -398,6 +464,9 @@ public final class ProxyManager: ObservableObject {
 
     public func saveSettings() {
         ProxySettingsStore.save(settings, to: settingsFile)
+        if let startedSettings, canStop {
+            needsRestart = startedSettings.models != settings.models
+        }
     }
 
     // MARK: - Process utilitaire
@@ -455,15 +524,19 @@ public final class ProxyManager: ObservableObject {
 }
 
 public enum ProxyError: Error, LocalizedError, Sendable {
+    case pythonMissing
     case venvCreationFailed
     case pipInstallFailed(Int32)
 
     public var errorDescription: String? {
+        let l10n = L10n.shared
         switch self {
+        case .pythonMissing:
+            return l10n.t("Python 3 est nécessaire. Installez les outils de développement Apple (gratuit, quelques minutes), puis réessayez.")
         case .venvCreationFailed:
-            return "Impossible de créer l'environnement virtuel (pip introuvable)."
+            return l10n.t("Impossible de créer l'environnement Python (pip introuvable).")
         case .pipInstallFailed(let code):
-            return "pip a échoué (code \(code)) — voir le journal d'installation."
+            return l10n.t("L'installation a échoué (code %@). Vérifiez votre connexion Internet, puis réessayez.", code)
         }
     }
 }

@@ -39,4 +39,16 @@ final class LocalizationTests: XCTestCase {
         l10n.lang = .fr
         XCTAssertEqual(UserDefaults.standard.string(forKey: "appLanguage"), "fr")
     }
+
+    func testFormattingNeverCrashesOnNonObjectArguments() {
+        let l10n = L10n()
+        l10n.lang = .fr
+        XCTAssertEqual(l10n.t("Tokens max : %@", 1024), "Tokens max : 1024")
+        XCTAssertEqual(l10n.t("%@ modèle(s) en cache", 3), "3 modèle(s) en cache")
+        // Relais d'arguments variadiques (helpers `tf` des vues).
+        let args: [Any] = [1, 6]
+        XCTAssertEqual(l10n.t("Étape %@ sur %@", arguments: args), "Étape 1 sur 6")
+        // Arguments manquants : le marqueur est laissé tel quel plutôt que de planter.
+        XCTAssertEqual(l10n.t("Étape %@ sur %@", arguments: [1]), "Étape 1 sur %@")
+    }
 }

@@ -19,7 +19,7 @@ struct ProviderFormView: View {
     @State private var ollamaError = ""
 
     private var t: (String) -> String { L10n.shared.t }
-    private func tf(_ key: String, _ args: CVarArg...) -> String { L10n.shared.t(key, args) }
+    private func tf(_ key: String, _ args: Any...) -> String { L10n.shared.t(key, arguments: args) }
 
     /// Modèles proposés : ceux détectés localement (Ollama) ou les modèles connus du preset.
     private var offeredModels: [KnownModel] {
@@ -27,6 +27,11 @@ struct ProviderFormView: View {
             return ollamaModels.map { KnownModel(id: $0) }
         }
         return preset.knownModels
+    }
+
+    /// Azure et « personnalisé » n'ont pas d'adresse par défaut : elle est obligatoire.
+    private var requiresAPIBase: Bool {
+        preset.id == "azure" || preset.id == "custom"
     }
 
     private var isValid: Bool {
@@ -69,8 +74,9 @@ struct ProviderFormView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                if !preset.defaultAPIBase.isEmpty || preset.id == "azure" || preset.id == "custom" {
-                    TextField(t("API base (optionnel)"), text: $model.apiBase)
+                if requiresAPIBase {
+                    TextField(t("Adresse du service (API base)"), text: $model.apiBase,
+                              prompt: Text("https://…"))
                         .textFieldStyle(.roundedBorder)
                 }
             }
@@ -95,7 +101,11 @@ struct ProviderFormView: View {
                 if !offeredModels.isEmpty {
                     Picker(t("Modèle du fournisseur"), selection: $selectedModel) {
                         ForEach(offeredModels) { m in
-                            Text(m.label).tag(m.id)
+                            if ollamaModels == nil, m.id == offeredModels.first?.id {
+                                Text(tf("%@ (recommandé)", m.label)).tag(m.id)
+                            } else {
+                                Text(m.label).tag(m.id)
+                            }
                         }
                         Text(t("Personnalisé…")).tag("")
                     }
@@ -112,14 +122,31 @@ struct ProviderFormView: View {
                             if model.name.isEmpty { model.name = customModelText }
                         }
                 }
-                TextField(t("Nom exposé"), text: $model.name,
-                          prompt: Text(t("Modèle du fournisseur")))
-                    .textFieldStyle(.roundedBorder)
-                    .help(t("Nom exposé"))
+            }
+
+            Section {
+                DisclosureGroup(t("Options avancées")) {
+                    TextField(t("Nom exposé"), text: $model.name,
+                              prompt: Text(t("Modèle du fournisseur")))
+                        .textFieldStyle(.roundedBorder)
+                    Text(t("Nom sous lequel ce modèle apparaît dans l'app et pour les autres outils."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if !requiresAPIBase {
+                        TextField(t("API base (optionnel)"), text: $model.apiBase)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                }
             }
         }
         .formStyle(.grouped)
         .onAppear { bootstrap() }
+        .task(id: preset.id) {
+            // Ollama : propose directement les modèles réellement installés sur le Mac.
+            if preset.id == "ollama", ollamaModels == nil {
+                await loadOllamaModels()
+            }
+        }
         .alert(
             detected.map { tf("Détecté : %@ — utiliser ce fournisseur ?", $0.displayName) } ?? "",
             isPresented: Binding(get: { detected != nil }, set: { if !$0 { detected = nil } })
@@ -180,9 +207,15 @@ struct ProviderFormView: View {
         ollamaError = ""
         defer { loadingOllama = false }
         do {
-            ollamaModels = try await OllamaCatalog.fetchModels(apiBase: model.apiBase)
+            let models = try await OllamaCatalog.fetchModels(apiBase: model.apiBase)
+            ollamaModels = models
+            if models.isEmpty {
+                ollamaError = t("Ollama ne contient encore aucun modèle. Installez-en un depuis l'app Ollama (ex. llama3.3).")
+            } else if !models.contains(selectedModel), let first = models.first {
+                selectedModel = first
+            }
         } catch {
-            ollamaError = error.localizedDescription
+            ollamaError = t("Ollama ne répond pas. Vérifiez qu'Ollama est installé et ouvert (ollama.com).")
         }
     }
 }

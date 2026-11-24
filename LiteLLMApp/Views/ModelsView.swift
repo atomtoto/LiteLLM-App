@@ -10,52 +10,51 @@ struct ModelsView: View {
     private var t: (String) -> String { L10n.shared.t }
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text(t("Modèles disponibles")).font(.headline)
-                Spacer()
-                Button(t("Actualiser")) { Task { await load() } }
-                Button(t("Fermer")) { dismiss() }
-            }
-            .padding()
-            Divider()
-            if loading && models.isEmpty {
-                ProgressView(t("Interrogation du serveur…"))
-                    .padding()
-            } else if models.isEmpty {
-                ContentUnavailableView {
-                    Label(t("Aucun modèle"), systemImage: "server.rack")
-                } description: {
-                    Text(message.isEmpty ? t("Actualisez la liste depuis votre serveur LiteLLM.") : message)
-                }
-            } else {
-                List(models) { model in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
+        NavigationStack {
+            Group {
+                if loading && models.isEmpty {
+                    ProgressView(t("Interrogation du serveur…"))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if models.isEmpty {
+                    ContentUnavailableView {
+                        Label(t("Aucun modèle"), systemImage: "server.rack")
+                    } description: {
+                        Text(message.isEmpty ? t("Ajoutez un fournisseur dans « Fournisseurs d'IA », puis actualisez.") : message)
+                    } actions: {
+                        Button(t("Réessayer")) { Task { await load() } }
+                    }
+                } else {
+                    List(models) { model in
+                        LabeledContent {
+                            if settings.defaultModel == model.id {
+                                Label(t("Par défaut"), systemImage: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                            } else {
+                                Button(t("Utiliser par défaut")) {
+                                    settings.defaultModel = model.id
+                                }
+                            }
+                        } label: {
                             Text(model.id)
                             if let owner = model.ownedBy {
                                 Text(owner)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
                             }
                         }
-                        Spacer()
-                        if settings.defaultModel == model.id {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                        }
-                        Button(t("Utiliser par défaut")) {
-                            settings.defaultModel = model.id
-                        }
+                        .padding(.vertical, 2)
                     }
-                    .padding(.vertical, 4)
                 }
             }
-            if !message.isEmpty && !models.isEmpty {
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.bottom, 8)
+            .navigationTitle(t("Modèles disponibles"))
+            .toolbar {
+                ToolbarItem {
+                    Button { Task { await load() } } label: {
+                        Label(t("Actualiser"), systemImage: "arrow.clockwise")
+                    }
+                    .disabled(loading)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(t("Terminé")) { dismiss() }
+                }
             }
         }
         .frame(minWidth: 520, minHeight: 380)
@@ -74,7 +73,8 @@ struct ModelsView: View {
             models = try await client.listModels()
             settings.availableModels = models.map(\.id).sorted()
         } catch {
-            message = L10n.shared.t("Échec : %@", error.localizedDescription)
+            models = []
+            message = FriendlyError.message(for: error)
         }
     }
 }

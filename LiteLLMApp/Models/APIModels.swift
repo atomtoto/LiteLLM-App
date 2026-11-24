@@ -154,15 +154,56 @@ public enum LiteLLMError: Error, LocalizedError, Sendable {
     case decodingFailed(String)
 
     public var errorDescription: String? {
+        let l10n = L10n.shared
         switch self {
         case .invalidURL:
-            return "URL du serveur invalide."
+            return l10n.t("URL du serveur invalide.")
         case .invalidResponse:
-            return "Réponse invalide du serveur."
+            return l10n.t("Réponse invalide du serveur.")
         case .httpError(let status, let message):
-            return "Erreur HTTP \(status) : \(message)"
+            return l10n.t("Erreur HTTP %@ : %@", status, message)
         case .decodingFailed(let detail):
-            return "Réponse illisible : \(detail)"
+            return l10n.t("Réponse illisible : %@", detail)
         }
+    }
+}
+
+/// Traduit une erreur technique en message compréhensible par un utilisateur non
+/// technique (cause probable + quoi faire), en gardant le détail technique à la fin.
+public enum FriendlyError {
+    public static func message(for error: Error, l10n: L10n = .shared) -> String {
+        if let error = error as? LiteLLMError, case .httpError(let status, let detail) = error {
+            let hint: String
+            switch status {
+            case 401, 403:
+                hint = l10n.t("La clé API a été refusée. Vérifiez la clé de votre fournisseur dans « Fournisseurs d'IA », ou relancez l'assistant de configuration.")
+            case 404:
+                hint = l10n.t("Ce modèle est introuvable. Choisissez un autre modèle dans la liste.")
+            case 408, 504:
+                hint = l10n.t("Le fournisseur a mis trop de temps à répondre. Réessayez dans un instant.")
+            case 429:
+                hint = l10n.t("Limite atteinte chez le fournisseur (trop de requêtes ou crédit épuisé). Patientez un peu ou vérifiez votre compte chez le fournisseur.")
+            case 400:
+                hint = l10n.t("La requête a été refusée par le fournisseur. Vérifiez que le modèle choisi est correct.")
+            case 500...599:
+                hint = l10n.t("Le fournisseur ou le proxy a rencontré une erreur. Réessayez dans un instant.")
+            default:
+                hint = l10n.t("Le serveur a renvoyé une erreur.")
+            }
+            return hint + "\n\n" + l10n.t("Détail : %@", "HTTP \(status) — \(detail)")
+        }
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .cannotConnectToHost, .cannotFindHost, .networkConnectionLost, .dnsLookupFailed:
+                return l10n.t("Impossible de joindre le serveur. Vérifiez que le proxy est démarré (bouton « Démarrer » en haut de la fenêtre).")
+            case .notConnectedToInternet:
+                return l10n.t("Pas de connexion Internet.")
+            case .timedOut:
+                return l10n.t("Le serveur ne répond pas (délai dépassé). Réessayez dans un instant.")
+            default:
+                break
+            }
+        }
+        return error.localizedDescription
     }
 }

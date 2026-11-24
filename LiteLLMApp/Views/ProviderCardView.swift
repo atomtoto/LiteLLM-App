@@ -1,10 +1,11 @@
 import SwiftUI
 
-/// Carte lisible d'un fournisseur connecté au proxy : presets, clé, test, édition.
+/// Ligne d'un fournisseur connecté au proxy : nom, modèle, test en un clic, édition, suppression.
 struct ProviderCardView: View {
     @Binding var model: ProxyModel
     @EnvironmentObject private var proxy: ProxyManager
     @State private var editing = false
+    @State private var confirmDelete = false
     @State private var testState: TestState = .idle
 
     private enum TestState: Equatable {
@@ -12,114 +13,118 @@ struct ProviderCardView: View {
     }
 
     private var t: (String) -> String { L10n.shared.t }
-    private func tf(_ key: String, _ args: CVarArg...) -> String { L10n.shared.t(key, args) }
+    private func tf(_ key: String, _ args: Any...) -> String { L10n.shared.t(key, arguments: args) }
 
     private var preset: ProviderPreset {
         ProviderPresets.preset(forProviderModel: model.providerModel)
     }
 
+    /// Fin de la clé (« ••••1234 ») pour reconnaître la clé sans l'afficher.
+    private var maskedKey: String {
+        let key = model.apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard key.count > 8 else { return key.isEmpty ? "" : "••••" }
+        return "••••" + key.suffix(4)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 10) {
                 Image(systemName: preset.systemImage)
                     .font(.title3)
                     .foregroundStyle(.tint)
                     .frame(width: 24)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(t(preset.displayName)).font(.headline)
-                    Text(model.providerModel)
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                testBadge
-                Button {
-                    Task { await runTest() }
-                } label: {
-                    if case .testing = testState {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Label(t("Tester"), systemImage: "play.circle")
-                    }
-                }
-                .disabled(!proxy.isRunning || isTesting)
-                .help(proxy.isRunning ? t("Tester") : t("Démarrez le proxy pour pouvoir tester"))
-                Button(t("Modifier")) { editing = true }
-                Button(role: .destructive) {
-                    proxy.settings.models.removeAll { $0.id == model.id }
-                    proxy.saveSettings()
-                } label: {
-                    Image(systemName: "minus.circle.fill")
-                }
-                .buttonStyle(.plain)
-                .help(t("Supprimer"))
-            }
-
-            HStack {
-                if preset.requiresAPIKey {
-                    SecureField(t("Clé API du fournisseur"), text: $model.apiKey)
-                        .textFieldStyle(.roundedBorder)
-                        .onChange(of: model.apiKey) { _, _ in proxy.saveSettings() }
-                } else {
-                    Text(t("Ce fournisseur n'a pas besoin de clé API."))
+                    Text(model.name.isEmpty ? t(preset.displayName) : model.name)
+                        .font(.headline)
+                    Text(subtitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-            }
-
-            if !model.apiBase.isEmpty {
-                Text(model.apiBase)
-                    .font(.caption2.monospaced())
-                    .foregroundStyle(.tertiary)
-            }
-
-            if !model.name.isEmpty {
-                Text(tf("Nom exposé : %@", model.name))
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-        }
-        .padding()
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
-        .sheet(isPresented: $editing) {
-            VStack(spacing: 0) {
-                ProviderFormView(model: $model, initialPreset: preset)
-                    .padding()
-                Divider()
-                HStack {
-                    Spacer()
-                    Button(t("Fermer")) { editing = false }
-                        .keyboardShortcut(.return)
+                Spacer()
+                Button {
+                    Task { await runTest() }
+                } label: {
+                    if testState == .testing {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Text(t("Tester"))
+                    }
                 }
-                .padding()
+                .disabled(!proxy.isRunning || testState == .testing || proxy.needsRestart)
+                .help(proxy.isRunning ? t("Envoie un court message pour vérifier la clé et le modèle")
+                                      : t("Démarrez le proxy pour pouvoir tester"))
+                Menu {
+                    Button(t("Modifier…"), systemImage: "pencil") { editing = true }
+                    Button(t("Supprimer…"), systemImage: "trash", role: .destructive) { confirmDelete = true }
+                } label: {
+                    Label(t("Actions"), systemImage: "ellipsis.circle")
+                        .labelStyle(.iconOnly)
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+            }
+            testResult
+        }
+        .padding(.vertical, 2)
+        .onChange(of: model) { _, _ in testState = .idle }
+        .sheet(isPresented: $editing, onDismiss: applyChanges) {
+            NavigationStack {
+                ProviderFormView(model: $model, initialPreset: preset)
+                    .navigationTitle(t("Modifier le fournisseur"))
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(t("Terminé")) { editing = false }
+                        }
+                    }
             }
             .frame(minWidth: 560, minHeight: 480)
-            .onDisappear { proxy.saveSettings() }
+        }
+        .confirmationDialog(tf("Supprimer « %@ » ?", model.name), isPresented: $confirmDelete) {
+            Button(t("Supprimer"), role: .destructive) { delete() }
+        } message: {
+            Text(t("Ce modèle ne sera plus disponible dans l'app ni pour vos autres outils."))
         }
     }
 
-    private var isTesting: Bool {
-        if case .testing = testState { return true }
-        return false
+    private var subtitle: String {
+        var parts = [t(preset.displayName), model.providerModel]
+        if preset.requiresAPIKey {
+            parts.append(maskedKey.isEmpty ? t("clé API manquante") : tf("clé %@", maskedKey))
+        }
+        return parts.joined(separator: " · ")
     }
 
     @ViewBuilder
-    private var testBadge: some View {
+    private var testResult: some View {
         switch testState {
-        case .idle:
-            EmptyView()
-        case .testing:
+        case .idle, .testing:
             EmptyView()
         case .ok:
-            Label(t("Clé valide ✓"), systemImage: "checkmark.circle.fill")
+            Label(t("Fonctionne correctement"), systemImage: "checkmark.circle.fill")
                 .foregroundStyle(.green)
                 .font(.caption)
         case .failed(let message):
-            Label(tf("Échec du test : %@", message), systemImage: "exclamationmark.triangle.fill")
+            Label(message, systemImage: "exclamationmark.triangle.fill")
                 .foregroundStyle(.red)
                 .font(.caption)
-                .lineLimit(1)
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
         }
+    }
+
+    private func applyChanges() {
+        proxy.saveSettings()
+        if proxy.needsRestart { proxy.restart() }
+    }
+
+    private func delete() {
+        // Capturer l'id avant : lire le binding pendant la mutation du tableau serait un accès concurrent.
+        let id = model.id
+        proxy.settings.models.removeAll { $0.id == id }
+        proxy.saveSettings()
+        if proxy.needsRestart { proxy.restart() }
     }
 
     private func runTest() async {
@@ -131,7 +136,7 @@ struct ProviderCardView: View {
             _ = try await client.testChatCompletion(model: target)
             testState = .ok
         } catch {
-            testState = .failed(error.localizedDescription)
+            testState = .failed(FriendlyError.message(for: error))
         }
     }
 }

@@ -19,11 +19,12 @@ Client macOS natif (SwiftUI) et simple pour un proxy [LiteLLM](https://github.co
 
 ## Utilisation
 
-**Avec le proxy géré par l'app** (recommandé) : ouvrir le panneau « Proxy LiteLLM local » (bouton CPU) → « Installer LiteLLM » → ajouter des modèles → « Démarrer » → « Utiliser comme serveur » → la clé API des réglages doit contenir la master key affichée dans le panneau.
+Au premier lancement, l'assistant guide pas à pas : choisir un fournisseur (ou coller sa clé, reconnue automatiquement), choisir un modèle, puis l'app installe et démarre le service local, teste le modèle et se branche dessus toute seule. Il suffit ensuite de cliquer « Commencer à discuter ».
 
-**Avec un proxy externe** : lancer `litellm --port 4000`, puis dans l'app → Réglages → indiquer l'URL (par défaut `http://localhost:4000`) et la clé API, puis « Tester la connexion ».
-
-Ensuite : « Nouvelle conversation », choisir un modèle, discuter.
+- **Fournisseurs d'IA** (bouton puce, ⇧⌘P) : ajouter/tester/modifier des fournisseurs, démarrer/arrêter le service, copier la configuration pour d'autres outils.
+- **Nouvelle conversation** : ⌘N. Entrée envoie, ⌥Entrée va à la ligne, Échap arrête la génération. Clic droit sur une conversation pour la renommer ou la supprimer.
+- Un bandeau en haut du chat signale un service arrêté ou en erreur, avec le bouton qui règle le problème.
+- **Avec un proxy externe** : Réglages ▸ Connexion → URL + clé API → « Tester la connexion ».
 
 ## Build & test en ligne de commande
 

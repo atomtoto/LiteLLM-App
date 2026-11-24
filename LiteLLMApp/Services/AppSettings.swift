@@ -25,6 +25,7 @@ public final class AppSettings: ObservableObject {
     @Published public var temperature: Double {
         didSet { Self.defaults.set(temperature, forKey: Keys.temperature) }
     }
+    /// 0 = pas de limite (le fournisseur choisit).
     @Published public var maxTokens: Int {
         didSet { Self.defaults.set(maxTokens, forKey: Keys.maxTokens) }
     }
@@ -40,7 +41,7 @@ public final class AppSettings: ObservableObject {
         self.serverURL = d.string(forKey: Keys.serverURL) ?? "http://localhost:4000"
         self.defaultModel = d.string(forKey: Keys.defaultModel) ?? ""
         self.temperature = d.object(forKey: Keys.temperature) as? Double ?? 0.7
-        self.maxTokens = d.object(forKey: Keys.maxTokens) as? Int ?? 1024
+        self.maxTokens = d.object(forKey: Keys.maxTokens) as? Int ?? 0
         self.systemPrompt = d.string(forKey: Keys.systemPrompt) ?? ""
         self.availableModels = d.array(forKey: Keys.availableModels) as? [String] ?? []
         self.apiKey = KeychainService.loadAPIKey() ?? ""
@@ -58,6 +59,37 @@ public final class AppSettings: ObservableObject {
     public func saveAPIKeyToKeychain() {
         guard !apiKey.isEmpty else { try? KeychainService.deleteAPIKey(); return }
         try? KeychainService.saveAPIKey(apiKey)
+    }
+
+    /// Branche l'app sur le proxy local : URL, master key et (optionnellement) modèle par défaut,
+    /// puis rafraîchit la liste des modèles en arrière-plan.
+    public func connect(toProxyAt url: URL, masterKey: String, defaultModel model: String? = nil) {
+        serverURL = url.absoluteString
+        apiKey = masterKey
+        saveAPIKeyToKeychain()
+        if let model, !model.isEmpty { defaultModel = model }
+        Task { await refreshAvailableModels() }
+    }
+
+    /// Vrai si l'app pointe sur cette URL (comparaison hôte + port, « localhost » ≈ « 127.0.0.1 »).
+    public func isConnected(to url: URL?) -> Bool {
+        guard let url, let baseURL else { return false }
+        func normalizedHost(_ u: URL) -> String {
+            let host = u.host?.lowercased() ?? ""
+            return host == "localhost" ? "127.0.0.1" : host
+        }
+        return normalizedHost(url) == normalizedHost(baseURL) && url.port == baseURL.port
+    }
+
+    /// Recharge la liste des modèles depuis le serveur (silencieux en cas d'échec).
+    @discardableResult
+    public func refreshAvailableModels() async -> Bool {
+        guard let client = makeClient(), let models = try? await client.listModels() else { return false }
+        availableModels = models.map(\.id).sorted()
+        if defaultModel.isEmpty || !availableModels.contains(defaultModel) {
+            defaultModel = availableModels.first ?? defaultModel
+        }
+        return true
     }
 
     public func makeClient() -> LiteLLMClient? {

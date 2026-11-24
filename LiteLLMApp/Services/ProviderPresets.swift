@@ -18,6 +18,8 @@ public struct ProviderPreset: Identifiable, Hashable, Sendable {
     /// Préfixe LiteLLM, ex. « openai/ » — le modèle complet est « préfixe + id du modèle ».
     public let litellmPrefix: String
     public let displayName: String
+    /// Courte description pour un utilisateur non technique (clé de traduction).
+    public let tagline: String
     public let systemImage: String
     public let knownModels: [KnownModel]
     /// API base par défaut (Ollama, Azure…), vide sinon.
@@ -28,12 +30,13 @@ public struct ProviderPreset: Identifiable, Hashable, Sendable {
     /// Page où créer une clé API.
     public let keyHelpURL: URL?
 
-    public init(id: String, litellmPrefix: String, displayName: String, systemImage: String,
+    public init(id: String, litellmPrefix: String, displayName: String, tagline: String = "", systemImage: String,
                 knownModels: [KnownModel], defaultAPIBase: String = "", requiresAPIKey: Bool = true,
                 keyPrefixes: [String] = [], keyHelpURL: URL? = nil) {
         self.id = id
         self.litellmPrefix = litellmPrefix
         self.displayName = displayName
+        self.tagline = tagline
         self.systemImage = systemImage
         self.knownModels = knownModels
         self.defaultAPIBase = defaultAPIBase
@@ -48,6 +51,7 @@ public enum ProviderPresets {
         id: "custom",
         litellmPrefix: "",
         displayName: "Personnalisé",
+        tagline: "Autre service compatible OpenAI",
         systemImage: "slider.horizontal.3",
         knownModels: []
     )
@@ -57,6 +61,7 @@ public enum ProviderPresets {
             id: "openai",
             litellmPrefix: "openai/",
             displayName: "OpenAI",
+            tagline: "Les modèles GPT (ChatGPT)",
             systemImage: "circle.hexagongrid.fill",
             knownModels: [
                 KnownModel(id: "gpt-4o"),
@@ -74,8 +79,12 @@ public enum ProviderPresets {
             id: "anthropic",
             litellmPrefix: "anthropic/",
             displayName: "Anthropic",
+            tagline: "Les modèles Claude",
             systemImage: "sparkles",
             knownModels: [
+                KnownModel(id: "claude-sonnet-5-5"),
+                KnownModel(id: "claude-opus-5-5"),
+                KnownModel(id: "claude-haiku-5-5"),
                 KnownModel(id: "claude-opus-4-1"),
                 KnownModel(id: "claude-sonnet-4-5"),
                 KnownModel(id: "claude-haiku-4-5"),
@@ -87,6 +96,7 @@ public enum ProviderPresets {
             id: "gemini",
             litellmPrefix: "gemini/",
             displayName: "Google Gemini",
+            tagline: "Les modèles Gemini de Google",
             systemImage: "globe",
             knownModels: [
                 KnownModel(id: "gemini-2.5-pro"),
@@ -100,6 +110,7 @@ public enum ProviderPresets {
             id: "mistral",
             litellmPrefix: "mistral/",
             displayName: "Mistral",
+            tagline: "IA européenne",
             systemImage: "wind",
             knownModels: [
                 KnownModel(id: "mistral-large-latest"),
@@ -112,6 +123,7 @@ public enum ProviderPresets {
             id: "ollama",
             litellmPrefix: "ollama/",
             displayName: "Ollama (local)",
+            tagline: "Gratuit, sur votre Mac, sans clé",
             systemImage: "desktopcomputer",
             knownModels: [
                 KnownModel(id: "llama3.3"),
@@ -126,6 +138,7 @@ public enum ProviderPresets {
             id: "azure",
             litellmPrefix: "azure/",
             displayName: "Azure OpenAI",
+            tagline: "Comptes entreprise Microsoft",
             systemImage: "cloud.fill",
             knownModels: [],
             keyHelpURL: URL(string: "https://portal.azure.com/")

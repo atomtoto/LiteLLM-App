@@ -81,7 +81,23 @@ final class APIModelsTests: XCTestCase {
     }
 
     func testErrorDescription() {
+        L10n.shared.lang = .fr
         let error = LiteLLMError.httpError(status: 401, message: "clé invalide")
         XCTAssertEqual(error.errorDescription, "Erreur HTTP 401 : clé invalide")
+    }
+
+    func testFriendlyErrorExplainsInvalidKey() {
+        let l10n = L10n()
+        l10n.lang = .fr
+        let message = FriendlyError.message(for: LiteLLMError.httpError(status: 401, message: "bad key"), l10n: l10n)
+        XCTAssertTrue(message.contains("clé API a été refusée"))
+        XCTAssertTrue(message.contains("bad key"))
+    }
+
+    func testFriendlyErrorExplainsUnreachableServer() {
+        let l10n = L10n()
+        l10n.lang = .en
+        let message = FriendlyError.message(for: URLError(.cannotConnectToHost), l10n: l10n)
+        XCTAssertTrue(message.contains("Could not reach the server"))
     }
 }
