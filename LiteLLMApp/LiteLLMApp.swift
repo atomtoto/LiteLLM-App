@@ -6,6 +6,11 @@ struct LiteLLMApp: App {
     @StateObject private var settings = AppSettings()
     @StateObject private var proxy = ProxyManager()
 
+    init() {
+        // Avant toute lecture des clés (AppSettings, ProxyManager).
+        KeychainService.migrateLegacyItemsIfNeeded()
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
