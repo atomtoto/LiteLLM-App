@@ -114,6 +114,8 @@ final class ProxyConfigTests: XCTestCase {
             ProxyModel(name: "claude", providerModel: "anthropic/claude-opus-5-5"),
         ]))
         XCTAssertTrue(hooks.contains("ADAPTIVE_MODELS = {\"claude\"}"))
+        XCTAssertTrue(hooks.contains("UNSUPPORTED_TOOLS = {\"namespace\", \"web_search\", \"web_search_preview\"}"))
+        XCTAssertTrue(hooks.contains("startswith(\"srvtoolu_\")"))
         XCTAssertTrue(hooks.contains("data[\"output_config\"] = {\"effort\": ADAPTIVE_EFFORTS.get(effort, \"high\")}"))
     }
 }

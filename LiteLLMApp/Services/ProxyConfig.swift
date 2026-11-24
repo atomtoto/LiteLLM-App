@@ -149,11 +149,21 @@ public enum YAMLEmitter {
         # (ex. « gpt-6.2-sol » choisi dans le sélecteur de l'app Codex).
         MODEL_HEADER = "\(modelHeader)"
         # Claude ≥ 4.6 : réflexion « adaptive » + output_config.effort (« max » est refusé par LiteLLM).
+        # Outils propres à OpenAI : sous-agents (`namespace`) et recherche web, que LiteLLM change en
+        # recherche exécutée par le fournisseur, dont Codex ne sait pas renvoyer le résultat.
+        UNSUPPORTED_TOOLS = {"namespace", "web_search", "web_search_preview"}
         ADAPTIVE_MODELS = \(pySet(adaptive))
         ADAPTIVE_EFFORTS = {"minimal": "low", "low": "low", "medium": "medium", "high": "high",
                             "xhigh": "xhigh", "max": "xhigh", "ultra": "xhigh"}
         # Autres fournisseurs : niveaux standard (« minimal » donnerait un budget de réflexion trop petit).
         STANDARD_EFFORTS = {"none": "none", "minimal": "low", "low": "low", "medium": "medium", "high": "high"}
+
+
+        def is_server_tool_item(item):
+            if not isinstance(item, dict):
+                return False
+            ids = (item.get("call_id"), item.get("id"))
+            return any(isinstance(i, str) and i.startswith("srvtoolu_") for i in ids)
 
 
         class LiteLLMAppHooks(CustomLogger):
@@ -166,7 +176,12 @@ public enum YAMLEmitter {
                     return data
                 tools = data.get("tools")
                 if isinstance(tools, list):
-                    data["tools"] = [t for t in tools if not (isinstance(t, dict) and t.get("type") == "namespace")]
+                    data["tools"] = [t for t in tools if not (isinstance(t, dict) and t.get("type") in UNSUPPORTED_TOOLS)]
+                # Recherches web déjà exécutées côté fournisseur (ids « srvtoolu_ ») : Codex les renvoie
+                # comme ses propres appels d'outils, ce qu'Anthropic refuse. On les retire de l'historique.
+                items = data.get("input")
+                if isinstance(items, list):
+                    data["input"] = [i for i in items if not is_server_tool_item(i)]
                 data.pop("client_metadata", None)
                 reasoning = data.get("reasoning")
                 effort = reasoning.get("effort") if isinstance(reasoning, dict) else None
