@@ -80,4 +80,22 @@ final class ProxyConfigTests: XCTestCase {
         let perms = attrs[.posixPermissions] as? Int
         XCTAssertEqual(perms, 0o600)
     }
+
+    func testConfigLoadsCodexCompatibilityHooks() throws {
+        let settings = ProxySettingsData(models: [
+            ProxyModel(name: "gpt", providerModel: "openai/gpt-5"),
+            ProxyModel(name: "claude", providerModel: "anthropic/claude-opus-5-5"),
+        ])
+        let yaml = YAMLEmitter.renderConfig(settings: settings, masterKey: "k")
+        XCTAssertTrue(yaml.contains("  callbacks: litellm_app_hooks.proxy_handler_instance"))
+        let hooks = YAMLEmitter.renderHooks(settings: settings)
+        XCTAssertTrue(hooks.contains("NATIVE_MODELS = {\"gpt\"}"))
+        XCTAssertTrue(hooks.contains("proxy_handler_instance = LiteLLMAppHooks()"))
+        XCTAssertTrue(hooks.contains("\n    async def async_pre_call_hook("))
+
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try ProxyConfigWriter.write(settings: settings, masterKey: "k", to: dir.appendingPathComponent("config.yaml"))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: dir.appendingPathComponent("litellm_app_hooks.py").path))
+    }
 }

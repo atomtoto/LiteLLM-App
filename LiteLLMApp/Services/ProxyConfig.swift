@@ -98,7 +98,43 @@ public enum YAMLEmitter {
         }
         lines.append("litellm_settings:")
         lines.append("  drop_params: true")
+        lines.append("  callbacks: \(hooksModule).proxy_handler_instance")
         return lines.joined(separator: "\n") + "\n"
+    }
+
+    /// Module Python des hooks, résolu par LiteLLM dans le dossier du config.yaml.
+    public static let hooksModule = "litellm_app_hooks"
+
+    /// Hook appliqué avant chaque requête : retire ce que seuls les modèles OpenAI comprennent
+    /// dans les requêtes de Codex (outils `namespace`, `client_metadata`), sans quoi
+    /// Anthropic, Mistral… renvoient une erreur.
+    public static func renderHooks(settings: ProxySettingsData) -> String {
+        let native = settings.models
+            .filter { $0.providerModel.lowercased().hasPrefix("openai/") }
+            .map { quote($0.name) }
+            .sorted()
+        return """
+        # Généré automatiquement par LiteLLM-App — toute édition manuelle sera écrasée.
+        from litellm.integrations.custom_logger import CustomLogger
+
+        # Modèles OpenAI : la requête leur est transmise telle quelle.
+        NATIVE_MODELS = {\(native.joined(separator: ", "))}
+
+
+        class LiteLLMAppHooks(CustomLogger):
+            async def async_pre_call_hook(self, user_api_key_dict, cache, data, call_type):
+                if data.get("model") in NATIVE_MODELS:
+                    return data
+                tools = data.get("tools")
+                if isinstance(tools, list):
+                    data["tools"] = [t for t in tools if not (isinstance(t, dict) and t.get("type") == "namespace")]
+                data.pop("client_metadata", None)
+                return data
+
+
+        proxy_handler_instance = LiteLLMAppHooks()
+
+        """
     }
 }
 
@@ -126,6 +162,8 @@ public enum ProxyConfigWriter {
     public static func write(settings: ProxySettingsData, masterKey: String,
                              to url: URL = ProxyPaths.configFile) throws -> String {
         let yaml = YAMLEmitter.renderConfig(settings: settings, masterKey: masterKey)
+        let hooks = url.deletingLastPathComponent().appendingPathComponent("\(YAMLEmitter.hooksModule).py")
+        try YAMLEmitter.renderHooks(settings: settings).write(to: hooks, atomically: true, encoding: .utf8)
         try yaml.write(to: url, atomically: true, encoding: .utf8)
         try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
         return yaml

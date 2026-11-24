@@ -51,7 +51,7 @@ public enum ShareConfig {
 /// Outil externe que l'on peut brancher sur le proxy local, quel que soit le fournisseur réel :
 /// le proxy traduit les formats OpenAI (Chat Completions / Responses) et Anthropic (Messages).
 public enum ExternalTool: String, CaseIterable, Identifiable, Sendable {
-    case codex, claudeCode, openAICompatible, anthropicCompatible
+    case codex, codexApp, claudeCode, openAICompatible, anthropicCompatible
 
     public var id: String { rawValue }
 
@@ -60,7 +60,15 @@ public enum ExternalTool: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .codex: return "codex"
         case .claudeCode: return "claude"
-        case .openAICompatible, .anthropicCompatible: return nil
+        case .codexApp, .openAICompatible, .anthropicCompatible: return nil
+        }
+    }
+
+    /// Emplacements connus de l'outil quand il n'est pas dans le PATH (ex. CLI embarqué dans ChatGPT.app).
+    public var fallbackPaths: [String] {
+        switch self {
+        case .codex: return ["/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"]
+        default: return []
         }
     }
 
@@ -69,7 +77,7 @@ public enum ExternalTool: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .codex: return "npm install -g @openai/codex"
         case .claudeCode: return "curl -fsSL https://claude.ai/install.sh | bash"
-        case .openAICompatible, .anthropicCompatible: return nil
+        case .codexApp, .openAICompatible, .anthropicCompatible: return nil
         }
     }
 }
@@ -102,6 +110,8 @@ extension ShareConfig {
               -c \(shellQuote(provider)) \\
               -m \(quotedModel)
             """
+        case .codexApp:
+            return CodexAppConfig.providerBlock(baseURL: base, apiKey: apiKey)
         case .claudeCode:
             return """
             ANTHROPIC_BASE_URL=\(shellQuote(base)) \\
@@ -131,10 +141,16 @@ extension ShareConfig {
         let command = command(for: tool, baseURL: baseURL, apiKey: apiKey, model: model)
         guard let executable = tool.executable else { return "#!/bin/zsh\n" + command + "\n" }
         let install = tool.installCommand ?? ""
+        // Repli sur une copie embarquée (fonction zsh : les affectations en préfixe restent exportées).
+        let fallbacks = tool.fallbackPaths.map { path in
+            "elif [ -x \(shellQuote(path)) ]; then\n  \(executable)() { \(shellQuote(path)) \"$@\"; }"
+        }.joined(separator: "\n")
         return """
         #!/bin/zsh
         cd ~
-        if ! command -v \(executable) >/dev/null 2>&1; then
+        if command -v \(executable) >/dev/null 2>&1; then
+          :
+        \(fallbacks.isEmpty ? "" : fallbacks + "\n")else
           echo "\(l10n.t("« %@ » est introuvable. Installez-le avec :", executable))"
           echo "  \(install)"
           exit 1
@@ -154,4 +170,122 @@ extension ShareConfig {
         NSWorkspace.shared.open(url)
     }
     #endif
+}
+
+// MARK: - App Codex (ChatGPT pour Mac)
+
+/// Branche l'app Codex (et le CLI `codex`) sur le proxy en éditant `~/.codex/config.toml`.
+/// Une app graphique ne voit pas les variables du Terminal : la clé est donc écrite dans la config.
+/// Chaque modification est marquée pour pouvoir être annulée et restaurer les réglages d'origine.
+public enum CodexAppConfig {
+    static let providerID = "litellm-app"
+    static let lineMarker = " # LiteLLM-App"
+    static let disabledPrefix = "# LiteLLM-App: "
+    static let blockStart = "# >>> LiteLLM-App (géré automatiquement)"
+    static let blockEnd = "# <<< LiteLLM-App"
+    /// Clés de premier niveau remplacées pendant l'activation (réactivées à la désactivation).
+    static let overriddenKeys = ["model", "model_provider", "model_reasoning_effort"]
+
+    public static var configURL: URL {
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex/config.toml")
+    }
+
+    /// Table `[model_providers.litellm-app]` pointant sur le proxy.
+    public static func providerBlock(baseURL: String, apiKey: String) -> String {
+        var base = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        while base.hasSuffix("/") { base.removeLast() }
+        return """
+        [model_providers.\(providerID)]
+        name = "LiteLLM"
+        base_url = \(YAMLEmitter.quote(base + "/v1"))
+        experimental_bearer_token = \(YAMLEmitter.quote(apiKey))
+        wire_api = "responses"
+        """
+    }
+
+    public static func isEnabled(_ toml: String) -> Bool {
+        toml.contains(blockStart)
+    }
+
+    /// Modèle actuellement imposé par LiteLLM-App, s'il est activé.
+    public static func enabledModel(_ toml: String) -> String? {
+        for line in toml.components(separatedBy: "\n") where line.hasSuffix(lineMarker) {
+            let body = line.dropLast(lineMarker.count)
+            guard key(of: String(body)) == "model", let eq = body.firstIndex(of: "=") else { continue }
+            return body[body.index(after: eq)...]
+                .trimmingCharacters(in: .whitespaces)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+        }
+        return nil
+    }
+
+    /// Ajoute (ou remplace) la configuration LiteLLM-App.
+    public static func enable(in toml: String, baseURL: String, apiKey: String, model: String) -> String {
+        var lines = disable(in: toml).components(separatedBy: "\n")
+        while lines.last?.isEmpty == true { lines.removeLast() }
+        // Les clés de premier niveau doivent précéder la première table `[...]`.
+        let firstTable = lines.firstIndex { $0.trimmingCharacters(in: .whitespaces).hasPrefix("[") } ?? lines.count
+        for i in 0..<firstTable where overriddenKeys.contains(key(of: lines[i]) ?? "") {
+            lines[i] = disabledPrefix + lines[i]
+        }
+        let header = [
+            "model = \(YAMLEmitter.quote(model))" + lineMarker,
+            "model_provider = \"\(providerID)\"" + lineMarker,
+        ]
+        lines.insert(contentsOf: header, at: 0)
+        lines += ["", blockStart, providerBlock(baseURL: baseURL, apiKey: apiKey), blockEnd]
+        return lines.joined(separator: "\n") + "\n"
+    }
+
+    /// Retire la configuration LiteLLM-App et réactive les réglages d'origine.
+    public static func disable(in toml: String) -> String {
+        let lines = toml.components(separatedBy: "\n")
+        // Clés redéfinies entre-temps (ex. modèle changé dans l'app Codex) : on ne restaure pas
+        // l'ancienne valeur, sinon la clé serait en double et le TOML invalide.
+        let firstTable = lines.firstIndex { $0.trimmingCharacters(in: .whitespaces).hasPrefix("[") } ?? lines.count
+        let activeKeys = Set(lines[..<firstTable].filter { !$0.hasSuffix(lineMarker) }.compactMap(key(of:)))
+        var result: [String] = []
+        var inBlock = false
+        for line in lines {
+            if line == blockStart { inBlock = true; continue }
+            if inBlock { if line == blockEnd { inBlock = false }; continue }
+            if line.hasSuffix(lineMarker) { continue }
+            if line.hasPrefix(disabledPrefix) {
+                let original = String(line.dropFirst(disabledPrefix.count))
+                if !activeKeys.contains(key(of: original) ?? "") { result.append(original) }
+                continue
+            }
+            result.append(line)
+        }
+        // Retire la ligne vide laissée avant le bloc.
+        while result.count > 1, result[result.count - 1].isEmpty, result[result.count - 2].isEmpty {
+            result.removeLast()
+        }
+        return result.joined(separator: "\n")
+    }
+
+    /// Nom de la clé d'une ligne `clé = valeur` (nil pour un commentaire, une table, une ligne vide).
+    static func key(of line: String) -> String? {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.hasPrefix("#"), !trimmed.hasPrefix("["), let eq = trimmed.firstIndex(of: "=") else { return nil }
+        return trimmed[..<eq].trimmingCharacters(in: .whitespaces)
+    }
+
+    // MARK: Fichier
+
+    public static func read() -> String {
+        (try? String(contentsOf: configURL, encoding: .utf8)) ?? ""
+    }
+
+    /// Écrit la nouvelle config ; sauvegarde l'originale une seule fois (`config.toml.bak-litellm-app`).
+    public static func write(_ toml: String) throws {
+        let fm = FileManager.default
+        try fm.createDirectory(at: configURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let backup = configURL.appendingPathExtension("bak-litellm-app")
+        if fm.fileExists(atPath: configURL.path), !fm.fileExists(atPath: backup.path) {
+            try fm.copyItem(at: configURL, to: backup)
+        }
+        try toml.write(to: configURL, atomically: true, encoding: .utf8)
+        try? fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: configURL.path)
+    }
 }

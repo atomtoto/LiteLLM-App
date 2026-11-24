@@ -10,16 +10,20 @@ struct ExternalToolsView: View {
     @AppStorage("externalToolModel") private var model = ""
     @State private var copied = false
     @State private var launchError: String?
+    /// Contenu actuel de `~/.codex/config.toml` (outil « App Codex »).
+    @State private var codexToml = ""
 
     private var t: (String) -> String { L10n.shared.t }
+    private func tf(_ key: String, _ args: Any...) -> String { L10n.shared.t(key, arguments: args) }
+
+    private var baseURL: String { proxy.baseURL?.absoluteString ?? "" }
 
     private var validModels: [ProxyModel] {
         proxy.settings.models.filter { !$0.name.isEmpty && !$0.providerModel.isEmpty }
     }
 
     private var command: String {
-        ShareConfig.command(for: tool, baseURL: proxy.baseURL?.absoluteString ?? "",
-                            apiKey: proxy.masterKey(), model: model)
+        ShareConfig.command(for: tool, baseURL: baseURL, apiKey: proxy.masterKey(), model: model)
     }
 
     var body: some View {
@@ -31,11 +35,16 @@ struct ExternalToolsView: View {
                         systemImage: "key",
                         description: Text(t("Ajoutez d'abord une clé API dans « Fournisseurs d'IA »."))
                     )
-                } else if !proxy.isRunning {
-                    notRunningSection
                 } else {
+                    if !proxy.isRunning {
+                        notRunningSection
+                    }
                     toolSection
-                    commandSection
+                    if tool == .codexApp {
+                        codexAppSection
+                    } else {
+                        commandSection
+                    }
                 }
             }
             .formStyle(.grouped)
@@ -47,11 +56,14 @@ struct ExternalToolsView: View {
             }
         }
         .frame(minWidth: 560, idealWidth: 620, minHeight: 440, idealHeight: 520)
-        .onAppear(perform: ensureValidModel)
+        .onAppear {
+            ensureValidModel()
+            codexToml = CodexAppConfig.read()
+        }
         .onChange(of: proxy.settings.models.count) { _, _ in ensureValidModel() }
-        .onChange(of: tool) { _, _ in copied = false }
+        .onChange(of: tool) { _, _ in copied = false; codexToml = CodexAppConfig.read() }
         .onChange(of: model) { _, _ in copied = false }
-        .alert(t("Impossible d'ouvrir le Terminal"), isPresented: Binding(
+        .alert(t("Une erreur est survenue"), isPresented: Binding(
             get: { launchError != nil }, set: { if !$0 { launchError = nil } }
         )) {
             Button(t("OK")) { launchError = nil }
@@ -103,6 +115,7 @@ struct ExternalToolsView: View {
                 if tool.executable != nil {
                     Button(t("Ouvrir dans le Terminal"), systemImage: "terminal", action: launch)
                         .buttonStyle(.borderedProminent)
+                        .disabled(!proxy.isRunning)
                 }
                 Button(t("Copier"), systemImage: "doc.on.doc") {
                     ShareConfig.copyValue(command)
@@ -123,11 +136,47 @@ struct ExternalToolsView: View {
         }
     }
 
+    private var codexAppSection: some View {
+        let enabled = CodexAppConfig.isEnabled(codexToml)
+        let upToDate = codexToml == CodexAppConfig.enable(in: codexToml, baseURL: baseURL,
+                                                          apiKey: proxy.masterKey(), model: model)
+        return Section {
+            LabeledContent {
+                HStack {
+                    if !upToDate {
+                        Button(enabled ? t("Mettre à jour") : t("Activer")) { applyCodexApp(enable: true) }
+                            .buttonStyle(.borderedProminent)
+                    }
+                    if enabled {
+                        Button(t("Désactiver")) { applyCodexApp(enable: false) }
+                    }
+                }
+            } label: {
+                if enabled {
+                    Label(tf("Activé avec « %@ »", CodexAppConfig.enabledModel(codexToml) ?? model),
+                          systemImage: "checkmark.circle.fill")
+                    Text(upToDate
+                         ? t("Quittez puis rouvrez l'app Codex pour appliquer le changement.")
+                         : t("Le modèle ou la clé du service a changé : mettez à jour la configuration."))
+                } else {
+                    Label(t("Désactivé"), systemImage: "circle")
+                    Text(t("L'app Codex utilise ses modèles OpenAI habituels."))
+                }
+            }
+        } header: {
+            Text(t("App Codex"))
+        } footer: {
+            Text(t("Modifie ~/.codex/config.toml (une sauvegarde est créée à côté) ; le CLI codex est aussi concerné. Tant que c'est activé, LiteLLM-App doit rester ouverte. « Désactiver » restaure vos réglages d'origine."))
+                .foregroundStyle(.secondary)
+        }
+    }
+
     // MARK: - Textes
 
     private func title(of tool: ExternalTool) -> String {
         switch tool {
-        case .codex: return "Codex (OpenAI)"
+        case .codex: return "Codex CLI"
+        case .codexApp: return t("App Codex (ChatGPT)")
         case .claudeCode: return "Claude Code"
         case .openAICompatible: return t("Autre outil (format OpenAI)")
         case .anthropicCompatible: return t("Autre outil (format Anthropic)")
@@ -138,6 +187,8 @@ struct ExternalToolsView: View {
         switch tool {
         case .codex:
             return t("Codex utilisera le modèle choisi (Claude, Mistral, Gemini…) au lieu des modèles OpenAI. Votre configuration Codex n'est pas modifiée.")
+        case .codexApp:
+            return t("L'app Codex pour Mac utilisera le modèle choisi (Claude, Mistral, Gemini…) au lieu des modèles OpenAI, jusqu'à ce que vous désactiviez l'option.")
         case .claudeCode:
             return t("Claude Code utilisera le modèle choisi (GPT, Mistral, Gemini…) à la place de Claude. Votre compte Claude n'est pas modifié.")
         case .openAICompatible:
@@ -155,10 +206,22 @@ struct ExternalToolsView: View {
         }
     }
 
+    private func applyCodexApp(enable: Bool) {
+        let current = CodexAppConfig.read()
+        let updated = enable
+            ? CodexAppConfig.enable(in: current, baseURL: baseURL, apiKey: proxy.masterKey(), model: model)
+            : CodexAppConfig.disable(in: current)
+        do {
+            try CodexAppConfig.write(updated)
+        } catch {
+            launchError = error.localizedDescription
+        }
+        codexToml = CodexAppConfig.read()
+    }
+
     private func launch() {
         do {
-            try ShareConfig.launchInTerminal(tool, baseURL: proxy.baseURL?.absoluteString ?? "",
-                                             apiKey: proxy.masterKey(), model: model)
+            try ShareConfig.launchInTerminal(tool, baseURL: baseURL, apiKey: proxy.masterKey(), model: model)
         } catch {
             launchError = error.localizedDescription
         }
