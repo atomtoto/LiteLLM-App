@@ -7,6 +7,7 @@ struct AppActions {
     var showProxy: () -> Void
     var showOnboarding: () -> Void
     var showModels: () -> Void
+    var showExternalTools: () -> Void
 }
 
 extension FocusedValues {
@@ -23,6 +24,7 @@ struct ContentView: View {
     @State private var showModels = false
     @State private var showProxy = false
     @State private var showOnboarding = false
+    @State private var showExternalTools = false
     @State private var renaming: Conversation?
     @State private var renameText = ""
     @State private var pendingDeletion: Conversation?
@@ -70,6 +72,7 @@ struct ContentView: View {
                 Menu {
                     Button(t("Assistant de configuration…"), systemImage: "wand.and.stars") { showOnboarding = true }
                     Button(t("Modèles disponibles…"), systemImage: "list.bullet") { showModels = true }
+                    Button(t("Utiliser avec d'autres apps…"), systemImage: "terminal") { showExternalTools = true }
                     Divider()
                     SettingsLink {
                         Label(t("Réglages…"), systemImage: "gear")
@@ -84,7 +87,8 @@ struct ContentView: View {
             newConversation: newConversation,
             showProxy: { showProxy = true },
             showOnboarding: { showOnboarding = true },
-            showModels: { showModels = true }
+            showModels: { showModels = true },
+            showExternalTools: { showExternalTools = true }
         ))
         .sheet(isPresented: $showModels) {
             ModelsView()
@@ -92,6 +96,10 @@ struct ContentView: View {
         .sheet(isPresented: $showProxy) {
             ProxyView()
                 .environmentObject(settings)
+                .environmentObject(proxy)
+        }
+        .sheet(isPresented: $showExternalTools) {
+            ExternalToolsView()
                 .environmentObject(proxy)
         }
         .sheet(isPresented: $showOnboarding) {

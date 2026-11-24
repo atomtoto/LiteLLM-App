@@ -38,15 +38,15 @@
 		A11CE000000000000000000A /* ../LiteLLMApp/Models/SSEParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../LiteLLMApp/Models/SSEParser.swift; sourceTree = "<group>"; };
 		A11CE000000000000000000B /* ../LiteLLMApp/Models/APIModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../LiteLLMApp/Models/APIModels.swift; sourceTree = "<group>"; };
 		A11CE000000000000000000C /* ../LiteLLMApp/Services/ProxyConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../LiteLLMApp/Services/ProxyConfig.swift; sourceTree = "<group>"; };
+		A11CE000000000000000000D /* LiteLLMApp/Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = LiteLLMApp/Info.plist; sourceTree = "<group>"; };
+		A11CE000000000000000000E /* LiteLLMApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LiteLLMApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A11CE000000000000000000F /* LiteLLMAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LiteLLMAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B22DF000000000000000011 /* ProviderPresetsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderPresetsTests.swift; sourceTree = "<group>"; };
 		B22DF000000000000000012 /* LocalizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationTests.swift; sourceTree = "<group>"; };
 		B22DF000000000000000013 /* ShareConfigTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareConfigTests.swift; sourceTree = "<group>"; };
 		B22DF000000000000000014 /* ../LiteLLMApp/Services/Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../LiteLLMApp/Services/Localization.swift; sourceTree = "<group>"; };
 		B22DF000000000000000015 /* ../LiteLLMApp/Services/ProviderPresets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../LiteLLMApp/Services/ProviderPresets.swift; sourceTree = "<group>"; };
 		B22DF000000000000000016 /* ../LiteLLMApp/Services/ShareConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../LiteLLMApp/Services/ShareConfig.swift; sourceTree = "<group>"; };
-		A11CE000000000000000000D /* LiteLLMApp/Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = LiteLLMApp/Info.plist; sourceTree = "<group>"; };
-		A11CE000000000000000000E /* LiteLLMApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LiteLLMApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A11CE000000000000000000F /* LiteLLMAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LiteLLMAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -302,10 +302,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				DEVELOPMENT_TEAM = RVBY9CDKL4;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = RVBY9CDKL4;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LiteLLMApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -324,10 +324,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				DEVELOPMENT_TEAM = RVBY9CDKL4;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = RVBY9CDKL4;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = LiteLLMApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -346,9 +346,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "Apple Development";
-				DEVELOPMENT_TEAM = RVBY9CDKL4;
 				CODE_SIGN_STYLE = Automatic;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = RVBY9CDKL4;
 				ENABLE_TESTABILITY = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.litellm.app.tests;
@@ -362,9 +362,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_IDENTITY = "Apple Development";
-				DEVELOPMENT_TEAM = RVBY9CDKL4;
 				CODE_SIGN_STYLE = Automatic;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = RVBY9CDKL4;
 				GENERATE_INFOPLIST_FILE = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.litellm.app.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";

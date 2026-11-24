@@ -15,6 +15,7 @@ struct ProxyView: View {
     @State private var shareModel = ""
     @State private var copied = false
     @State private var confirmRegenerate = false
+    @State private var showExternalTools = false
 
     private var t: (String) -> String { L10n.shared.t }
     private func tf(_ key: String, _ args: Any...) -> String { L10n.shared.t(key, arguments: args) }
@@ -41,6 +42,10 @@ struct ProxyView: View {
         .frame(minWidth: 620, idealWidth: 680, minHeight: 560, idealHeight: 680)
         .sheet(isPresented: $showAddProvider) {
             addProviderSheet
+        }
+        .sheet(isPresented: $showExternalTools) {
+            ExternalToolsView()
+                .environmentObject(proxy)
         }
         .onAppear {
             if shareModel.isEmpty {
@@ -206,6 +211,12 @@ struct ProxyView: View {
 
     private var useElsewhereSection: some View {
         Section {
+            LabeledContent {
+                Button(t("Configurer…")) { showExternalTools = true }
+            } label: {
+                Text(t("Utiliser avec Codex, Claude Code…"))
+                Text(t("Branchez vos autres outils sur ces fournisseurs, par exemple Codex avec une clé Anthropic."))
+            }
             DisclosureGroup(t("Utiliser ce proxy ailleurs")) {
                 Text(t("N'importe quel outil compatible OpenAI (curl, SDK Python, LangChain…) peut appeler cette URL avec cette clé : le proxy convertit automatiquement la requête dans le format de votre fournisseur."))
                     .font(.callout)

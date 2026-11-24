@@ -48,6 +48,7 @@ private struct AppCommands: Commands {
                 .keyboardShortcut("p", modifiers: [.command, .shift])
             Button(t("Modèles disponibles…")) { actions?.showModels() }
                 .keyboardShortcut("m", modifiers: [.command, .shift])
+            Button(t("Utiliser avec d'autres apps…")) { actions?.showExternalTools() }
             Divider()
             Button(t("Assistant de configuration…")) { actions?.showOnboarding() }
         }

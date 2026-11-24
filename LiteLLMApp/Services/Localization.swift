@@ -420,5 +420,28 @@ public final class L10n {
         "Régler la créativité": "Adjust creativity",
         "Désactivé : le modèle choisit lui-même (recommandé).": "Off: the model decides by itself (recommended).",
         "Le service IA ne connaît pas encore ce modèle. Redémarrez le service dans « Fournisseurs d'IA », puis réessayez.": "The AI service doesn't know this model yet. Restart the service in “AI Providers”, then retry.",
+
+        // MARK: ExternalToolsView
+        "Utiliser avec d'autres apps": "Use with other apps",
+        "Utiliser avec d'autres apps…": "Use with other apps…",
+        "Aucun fournisseur": "No provider",
+        "Ajoutez d'abord une clé API dans « Fournisseurs d'IA ».": "First add an API key in “AI Providers”.",
+        "Impossible d'ouvrir le Terminal": "Couldn't open Terminal",
+        "Il doit tourner pour que les autres apps puissent l'utiliser.": "It must be running for other apps to use it.",
+        "Outil": "Tool",
+        "Ouvrir dans le Terminal": "Open in Terminal",
+        "Commande à lancer": "Command to run",
+        "Variables à définir": "Variables to set",
+        "Gardez LiteLLM-App ouverte pendant l'utilisation : le service s'arrête quand l'app se ferme (modifiable dans « Fournisseurs d'IA » ▸ Options).": "Keep LiteLLM-App open while using it: the service stops when the app quits (configurable in “AI Providers” ▸ Options).",
+        "Autre outil (format OpenAI)": "Other tool (OpenAI format)",
+        "Autre outil (format Anthropic)": "Other tool (Anthropic format)",
+        "Codex utilisera le modèle choisi (Claude, Mistral, Gemini…) au lieu des modèles OpenAI. Votre configuration Codex n'est pas modifiée.": "Codex will use the chosen model (Claude, Mistral, Gemini…) instead of OpenAI models. Your Codex configuration is not changed.",
+        "Claude Code utilisera le modèle choisi (GPT, Mistral, Gemini…) à la place de Claude. Votre compte Claude n'est pas modifié.": "Claude Code will use the chosen model (GPT, Mistral, Gemini…) instead of Claude. Your Claude account is not changed.",
+        "Pour les outils et SDK compatibles OpenAI (Aider, LangChain, SDK Python…) : définissez ces variables, puis indiquez le nom du modèle.": "For OpenAI-compatible tools and SDKs (Aider, LangChain, Python SDK…): set these variables, then use the model name.",
+        "Pour les outils et SDK compatibles Anthropic : définissez ces variables, puis indiquez le nom du modèle.": "For Anthropic-compatible tools and SDKs: set these variables, then use the model name.",
+        "Configurer…": "Set up…",
+        "Utiliser avec Codex, Claude Code…": "Use with Codex, Claude Code…",
+        "Branchez vos autres outils sur ces fournisseurs, par exemple Codex avec une clé Anthropic.": "Connect your other tools to these providers, e.g. Codex with an Anthropic key.",
+        "« %@ » est introuvable. Installez-le avec :": "“%@” was not found. Install it with:",
     ]
 }
