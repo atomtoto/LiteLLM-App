@@ -90,6 +90,8 @@ final class ProxyConfigTests: XCTestCase {
         XCTAssertTrue(yaml.contains("  callbacks: litellm_app_hooks.proxy_handler_instance"))
         let hooks = YAMLEmitter.renderHooks(settings: settings)
         XCTAssertTrue(hooks.contains("NATIVE_MODELS = {\"gpt\"}"))
+        XCTAssertTrue(hooks.contains("KNOWN_MODELS = {\"claude\", \"gpt\"}"))
+        XCTAssertTrue(YAMLEmitter.renderHooks(settings: ProxySettingsData()).contains("NATIVE_MODELS = set()"))
         XCTAssertTrue(hooks.contains("proxy_handler_instance = LiteLLMAppHooks()"))
         XCTAssertTrue(hooks.contains("\n    async def async_pre_call_hook("))
 

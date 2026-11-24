@@ -104,31 +104,49 @@ public enum YAMLEmitter {
 
     /// Module Python des hooks, résolu par LiteLLM dans le dossier du config.yaml.
     public static let hooksModule = "litellm_app_hooks"
+    /// En-tête HTTP indiquant au hook le modèle de repli (voir `CodexAppConfig`).
+    public static let modelHeader = "x-litellm-app-model"
 
-    /// Hook appliqué avant chaque requête : retire ce que seuls les modèles OpenAI comprennent
-    /// dans les requêtes de Codex (outils `namespace`, `client_metadata`), sans quoi
+    /// Hook appliqué avant chaque requête : redirige les modèles inconnus vers le modèle choisi
+    /// pour Codex, et retire ce que seuls les modèles OpenAI comprennent (outils `namespace`,
+    /// `client_metadata`, niveau de raisonnement), sans quoi
     /// Anthropic, Mistral… renvoient une erreur.
     public static func renderHooks(settings: ProxySettingsData) -> String {
-        let native = settings.models
-            .filter { $0.providerModel.lowercased().hasPrefix("openai/") }
-            .map { quote($0.name) }
-            .sorted()
+        let valid = settings.models.filter { !$0.name.isEmpty && !$0.providerModel.isEmpty }
+        func pySet(_ models: [ProxyModel]) -> String {
+            models.isEmpty ? "set()" : "{" + models.map { quote($0.name) }.sorted().joined(separator: ", ") + "}"
+        }
+        let native = valid.filter { $0.providerModel.lowercased().hasPrefix("openai/") }
         return """
         # Généré automatiquement par LiteLLM-App — toute édition manuelle sera écrasée.
         from litellm.integrations.custom_logger import CustomLogger
 
+        KNOWN_MODELS = \(pySet(valid))
         # Modèles OpenAI : la requête leur est transmise telle quelle.
-        NATIVE_MODELS = {\(native.joined(separator: ", "))}
+        NATIVE_MODELS = \(pySet(native))
+        # En-tête envoyé par Codex : modèle à utiliser quand il demande un modèle inconnu du proxy
+        # (ex. « gpt-6.2-sol » choisi dans le sélecteur de l'app Codex).
+        MODEL_HEADER = "\(modelHeader)"
 
 
         class LiteLLMAppHooks(CustomLogger):
             async def async_pre_call_hook(self, user_api_key_dict, cache, data, call_type):
+                headers = (data.get("proxy_server_request") or {}).get("headers") or {}
+                fallback = next((v for k, v in headers.items() if k.lower() == MODEL_HEADER), None)
+                if data.get("model") not in KNOWN_MODELS and fallback in KNOWN_MODELS:
+                    data["model"] = fallback
                 if data.get("model") in NATIVE_MODELS:
                     return data
                 tools = data.get("tools")
                 if isinstance(tools, list):
                     data["tools"] = [t for t in tools if not (isinstance(t, dict) and t.get("type") == "namespace")]
                 data.pop("client_metadata", None)
+                # Les niveaux de raisonnement de Codex (minimal, xhigh…) sont mal traduits pour les
+                # autres fournisseurs (ex. Claude récents) : le modèle garde son comportement par défaut.
+                reasoning = data.get("reasoning")
+                if isinstance(reasoning, dict):
+                    reasoning.pop("effort", None)
+                data.pop("reasoning_effort", None)
                 return data
 
 

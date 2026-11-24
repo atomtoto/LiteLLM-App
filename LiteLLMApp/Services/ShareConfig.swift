@@ -103,7 +103,8 @@ extension ShareConfig {
         case .codex:
             // Fournisseur « litellm » déclaré à la volée : la config de Codex n'est pas modifiée.
             let provider = "model_providers.litellm={ name = \"LiteLLM\", base_url = \"\(base)/v1\", "
-                + "env_key = \"LITELLM_API_KEY\", wire_api = \"responses\" }"
+                + "env_key = \"LITELLM_API_KEY\", wire_api = \"responses\", "
+                + "http_headers = { \"\(YAMLEmitter.modelHeader)\" = \(YAMLEmitter.quote(model)) } }"
             return """
             LITELLM_API_KEY=\(key) codex \\
               -c model_provider=litellm \\
@@ -111,7 +112,7 @@ extension ShareConfig {
               -m \(quotedModel)
             """
         case .codexApp:
-            return CodexAppConfig.providerBlock(baseURL: base, apiKey: apiKey)
+            return CodexAppConfig.providerBlock(baseURL: base, apiKey: apiKey, model: model)
         case .claudeCode:
             return """
             ANTHROPIC_BASE_URL=\(shellQuote(base)) \\
@@ -184,14 +185,20 @@ public enum CodexAppConfig {
     static let blockStart = "# >>> LiteLLM-App (géré automatiquement)"
     static let blockEnd = "# <<< LiteLLM-App"
     /// Clés de premier niveau remplacées pendant l'activation (réactivées à la désactivation).
-    static let overriddenKeys = ["model", "model_provider", "model_reasoning_effort"]
+    static let overriddenKeys = ["model", "model_provider", "model_reasoning_effort", "model_catalog_json"]
 
     public static var configURL: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex/config.toml")
     }
 
+    /// Catalogue de modèles (`model_catalog_json`) : le sélecteur de l'app Codex n'affiche que ceux du proxy.
+    public static var catalogURL: URL {
+        configURL.deletingLastPathComponent().appendingPathComponent("litellm-app-models.json")
+    }
+
     /// Table `[model_providers.litellm-app]` pointant sur le proxy.
-    public static func providerBlock(baseURL: String, apiKey: String) -> String {
+    /// L'en-tête de modèle redirige vers `model` les modèles OpenAI choisis dans le sélecteur de Codex.
+    public static func providerBlock(baseURL: String, apiKey: String, model: String) -> String {
         var base = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         while base.hasSuffix("/") { base.removeLast() }
         return """
@@ -200,6 +207,7 @@ public enum CodexAppConfig {
         base_url = \(YAMLEmitter.quote(base + "/v1"))
         experimental_bearer_token = \(YAMLEmitter.quote(apiKey))
         wire_api = "responses"
+        http_headers = { "\(YAMLEmitter.modelHeader)" = \(YAMLEmitter.quote(model)) }
         """
     }
 
@@ -220,7 +228,8 @@ public enum CodexAppConfig {
     }
 
     /// Ajoute (ou remplace) la configuration LiteLLM-App.
-    public static func enable(in toml: String, baseURL: String, apiKey: String, model: String) -> String {
+    public static func enable(in toml: String, baseURL: String, apiKey: String, model: String,
+                              catalogPath: String? = nil) -> String {
         var lines = disable(in: toml).components(separatedBy: "\n")
         while lines.last?.isEmpty == true { lines.removeLast() }
         // Les clés de premier niveau doivent précéder la première table `[...]`.
@@ -231,9 +240,9 @@ public enum CodexAppConfig {
         let header = [
             "model = \(YAMLEmitter.quote(model))" + lineMarker,
             "model_provider = \"\(providerID)\"" + lineMarker,
-        ]
+        ] + (catalogPath.map { ["model_catalog_json = \(YAMLEmitter.quote($0))" + lineMarker] } ?? [])
         lines.insert(contentsOf: header, at: 0)
-        lines += ["", blockStart, providerBlock(baseURL: baseURL, apiKey: apiKey), blockEnd]
+        lines += ["", blockStart, providerBlock(baseURL: baseURL, apiKey: apiKey, model: model), blockEnd]
         return lines.joined(separator: "\n") + "\n"
     }
 
@@ -269,6 +278,88 @@ public enum CodexAppConfig {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         guard !trimmed.hasPrefix("#"), !trimmed.hasPrefix("["), let eq = trimmed.firstIndex(of: "=") else { return nil }
         return trimmed[..<eq].trimmingCharacters(in: .whitespaces)
+    }
+
+    // MARK: Catalogue de modèles
+
+    /// Emplacements possibles du CLI Codex (une app graphique n'a pas le PATH du Terminal).
+    static var executableCandidates: [String] {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return ExternalTool.codex.fallbackPaths + [
+            "/opt/homebrew/bin/codex", "/usr/local/bin/codex",
+            "\(home)/.local/bin/codex", "\(home)/.npm-global/bin/codex",
+        ]
+    }
+
+    /// Entrée du catalogue de Codex servant de modèle : la première en mode outils classique
+    /// (appels de fonctions), que les autres fournisseurs savent exécuter via LiteLLM.
+    /// Les modèles « code mode » de Codex n'envoient pas d'outils et ne conviennent pas.
+    public static func fetchTemplate() async -> [String: Any]? {
+        await Task.detached {
+            guard let path = executableCandidates.first(where: FileManager.default.isExecutableFile(atPath:)) else {
+                return nil
+            }
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: path)
+            process.arguments = ["debug", "models", "--bundled"]
+            process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = FileHandle.nullDevice
+            process.standardInput = FileHandle.nullDevice
+            guard (try? process.run()) != nil else { return nil }
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            return template(fromCatalog: data)
+        }.value
+    }
+
+    static func template(fromCatalog data: Data) -> [String: Any]? {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let models = root["models"] as? [[String: Any]] else { return nil }
+        return models.first { $0["tool_mode"] == nil || $0["tool_mode"] is NSNull }
+    }
+
+    /// Catalogue listant les modèles du proxy (`defaultModel` en premier).
+    public static func catalog(models: [String], defaultModel: String, template: [String: Any]?) throws -> Data {
+        let ordered = [defaultModel] + models.filter { $0 != defaultModel }
+        let entries: [[String: Any]] = ordered.enumerated().map { index, slug in
+            var entry = template ?? [
+                "base_instructions": "You are a coding agent running in the user's terminal. Use the available tools to inspect and edit files and run commands until the task is complete, then summarize what you did.",
+                "shell_type": "unified_exec",
+                "support_verbosity": false,
+                "truncation_policy": ["mode": "tokens", "limit": 10000],
+            ]
+            entry["slug"] = slug
+            entry["display_name"] = slug
+            entry["description"] = "LiteLLM-App"
+            entry["visibility"] = "list"
+            entry["supported_in_api"] = true
+            entry["priority"] = index
+            // Réglages propres aux modèles OpenAI (raisonnement, vitesse, sous-agents…) désactivés.
+            entry["supported_reasoning_levels"] = [Any]()
+            entry["experimental_supported_tools"] = [Any]()
+            entry["additional_speed_tiers"] = [Any]()
+            entry["service_tiers"] = [Any]()
+            entry["supports_search_tool"] = false
+            entry["supports_reasoning_effort_updates"] = false
+            entry["use_responses_lite"] = false
+            for key in ["tool_mode", "apply_patch_tool_type", "default_reasoning_level", "upgrade",
+                        "availability_nux", "multi_agent_version", "multi_agent_reasoning_effort",
+                        "available_access_programs"] {
+                entry.removeValue(forKey: key)
+            }
+            return entry
+        }
+        return try JSONSerialization.data(withJSONObject: ["models": entries], options: [.sortedKeys])
+    }
+
+    /// Modèles listés dans le catalogue installé (vide s'il n'existe pas).
+    public static func catalogModels() -> [String] {
+        guard let data = try? Data(contentsOf: catalogURL),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let models = root["models"] as? [[String: Any]] else { return [] }
+        return models.compactMap { $0["slug"] as? String }
     }
 
     // MARK: Fichier

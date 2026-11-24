@@ -71,6 +71,7 @@ final class ShareConfigTests: XCTestCase {
         XCTAssertTrue(enabled.contains("# LiteLLM-App: model_reasoning_effort"))
         XCTAssertTrue(enabled.contains("experimental_bearer_token = \"sk-master\""))
         XCTAssertTrue(enabled.contains("base_url = \"http://127.0.0.1:4000/v1\""))
+        XCTAssertTrue(enabled.contains("http_headers = { \"x-litellm-app-model\" = \"claude\" }"))
         // Réactiver est idempotent, désactiver restaure l'original.
         XCTAssertEqual(CodexAppConfig.enable(in: enabled, baseURL: "http://127.0.0.1:4000", apiKey: "sk-master", model: "claude"), enabled)
         XCTAssertEqual(CodexAppConfig.disable(in: enabled), original + "\n")
@@ -95,5 +96,34 @@ final class ShareConfigTests: XCTestCase {
     func testCodexLaunchScriptFallsBackToEmbeddedCLI() {
         let script = ShareConfig.launchScript(for: .codex, baseURL: "http://h:1", apiKey: "k", model: "m")
         XCTAssertTrue(script.contains("elif [ -x '/Applications/ChatGPT.app/"))
+    }
+
+    func testCodexCatalogUsesClassicToolTemplate() throws {
+        let raw = """
+        {"models":[{"slug":"gpt-code","tool_mode":"code_mode_only","base_instructions":"A"},
+                   {"slug":"gpt-classic","tool_mode":null,"base_instructions":"B","apply_patch_tool_type":"freeform",
+                    "supported_reasoning_levels":[{"effort":"low"}],"shell_type":"unified_exec"}]}
+        """
+        let template = try XCTUnwrap(CodexAppConfig.template(fromCatalog: Data(raw.utf8)))
+        XCTAssertEqual(template["slug"] as? String, "gpt-classic")
+
+        let data = try CodexAppConfig.catalog(models: ["a", "b"], defaultModel: "b", template: template)
+        let models = try XCTUnwrap((JSONSerialization.jsonObject(with: data) as? [String: Any])?["models"] as? [[String: Any]])
+        XCTAssertEqual(models.map { $0["slug"] as? String }, ["b", "a"])
+        XCTAssertEqual(models[0]["base_instructions"] as? String, "B")
+        XCTAssertNil(models[0]["apply_patch_tool_type"])
+        XCTAssertEqual((models[0]["supported_reasoning_levels"] as? [Any])?.count, 0)
+
+        // Sans CLI Codex : entrée minimale autonome.
+        let fallback = try CodexAppConfig.catalog(models: ["m"], defaultModel: "m", template: nil)
+        XCTAssertTrue(String(decoding: fallback, as: UTF8.self).contains("base_instructions"))
+    }
+
+    func testCodexAppEnableWithCatalogRoundTrip() {
+        let original = "model_catalog_json = \"/old.json\"\n"
+        let enabled = CodexAppConfig.enable(in: original, baseURL: "http://h:1", apiKey: "k", model: "m", catalogPath: "/new.json")
+        XCTAssertTrue(enabled.contains("model_catalog_json = \"/new.json\" # LiteLLM-App"))
+        XCTAssertTrue(enabled.contains("# LiteLLM-App: model_catalog_json = \"/old.json\""))
+        XCTAssertEqual(CodexAppConfig.disable(in: enabled), original)
     }
 }

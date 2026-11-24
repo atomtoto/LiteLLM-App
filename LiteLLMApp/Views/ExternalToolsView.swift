@@ -12,6 +12,7 @@ struct ExternalToolsView: View {
     @State private var launchError: String?
     /// Contenu actuel de `~/.codex/config.toml` (outil « App Codex »).
     @State private var codexToml = ""
+    @State private var isApplying = false
 
     private var t: (String) -> String { L10n.shared.t }
     private func tf(_ key: String, _ args: Any...) -> String { L10n.shared.t(key, arguments: args) }
@@ -138,17 +139,23 @@ struct ExternalToolsView: View {
 
     private var codexAppSection: some View {
         let enabled = CodexAppConfig.isEnabled(codexToml)
-        let upToDate = codexToml == CodexAppConfig.enable(in: codexToml, baseURL: baseURL,
-                                                          apiKey: proxy.masterKey(), model: model)
+        let upToDate = codexToml == CodexAppConfig.enable(in: codexToml, baseURL: baseURL, apiKey: proxy.masterKey(),
+                                                          model: model, catalogPath: CodexAppConfig.catalogURL.path)
+            && CodexAppConfig.catalogModels() == [model] + validModels.map(\.name).filter { $0 != model }
         return Section {
             LabeledContent {
                 HStack {
+                    if isApplying {
+                        ProgressView().controlSize(.small)
+                    }
                     if !upToDate {
-                        Button(enabled ? t("Mettre à jour") : t("Activer")) { applyCodexApp(enable: true) }
+                        Button(enabled ? t("Mettre à jour") : t("Activer")) { Task { await applyCodexApp(enable: true) } }
                             .buttonStyle(.borderedProminent)
+                            .disabled(isApplying)
                     }
                     if enabled {
-                        Button(t("Désactiver")) { applyCodexApp(enable: false) }
+                        Button(t("Désactiver")) { Task { await applyCodexApp(enable: false) } }
+                            .disabled(isApplying)
                     }
                 }
             } label: {
@@ -206,13 +213,23 @@ struct ExternalToolsView: View {
         }
     }
 
-    private func applyCodexApp(enable: Bool) {
+    private func applyCodexApp(enable: Bool) async {
+        isApplying = true
+        defer { isApplying = false }
         let current = CodexAppConfig.read()
-        let updated = enable
-            ? CodexAppConfig.enable(in: current, baseURL: baseURL, apiKey: proxy.masterKey(), model: model)
-            : CodexAppConfig.disable(in: current)
         do {
-            try CodexAppConfig.write(updated)
+            if enable {
+                // Catalogue : le sélecteur de Codex propose les modèles du proxy, en mode outils classique.
+                let template = await CodexAppConfig.fetchTemplate()
+                let catalog = try CodexAppConfig.catalog(models: validModels.map(\.name), defaultModel: model,
+                                                         template: template)
+                try catalog.write(to: CodexAppConfig.catalogURL, options: .atomic)
+                try CodexAppConfig.write(CodexAppConfig.enable(in: current, baseURL: baseURL, apiKey: proxy.masterKey(),
+                                                               model: model, catalogPath: CodexAppConfig.catalogURL.path))
+            } else {
+                try CodexAppConfig.write(CodexAppConfig.disable(in: current))
+                try? FileManager.default.removeItem(at: CodexAppConfig.catalogURL)
+            }
         } catch {
             launchError = error.localizedDescription
         }
