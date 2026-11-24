@@ -22,6 +22,26 @@ public struct ProxyModel: Codable, Identifiable, Equatable, Sendable {
     }
 }
 
+extension ProxyModel {
+    /// Claude ≥ 4.6 via l'API Anthropic : la réflexion est « adaptive » et son niveau passe par
+    /// `output_config.effort` (l'ancien `thinking.budget_tokens` est refusé par les modèles récents).
+    public var usesAdaptiveThinking: Bool {
+        let id = providerModel.lowercased()
+        guard id.hasPrefix("anthropic/"),
+              let match = id.firstMatch(of: /claude-(?:opus|sonnet|haiku)-(\d+)(?:-(\d{1,2})(?!\d))?/) else {
+            return false
+        }
+        let major = Int(match.1) ?? 0
+        let minor = match.2.flatMap { Int($0) } ?? 0
+        return major > 4 || (major == 4 && minor >= 6)
+    }
+
+    /// Niveaux de raisonnement proposés dans Codex pour ce modèle (traduits par le hook du proxy).
+    public var reasoningEfforts: [String] {
+        usesAdaptiveThinking ? ["low", "medium", "high", "xhigh"] : ["low", "medium", "high"]
+    }
+}
+
 /// Réglages du proxy local persistés en JSON dans Application Support.
 public struct ProxySettingsData: Codable, Equatable, Sendable {
     public var host: String = "127.0.0.1"
@@ -108,8 +128,8 @@ public enum YAMLEmitter {
     public static let modelHeader = "x-litellm-app-model"
 
     /// Hook appliqué avant chaque requête : redirige les modèles inconnus vers le modèle choisi
-    /// pour Codex, et retire ce que seuls les modèles OpenAI comprennent (outils `namespace`,
-    /// `client_metadata`, niveau de raisonnement), sans quoi
+    /// pour Codex, retire ce que seuls les modèles OpenAI comprennent (outils `namespace`,
+    /// `client_metadata`) et traduit le niveau de raisonnement, sans quoi
     /// Anthropic, Mistral… renvoient une erreur.
     public static func renderHooks(settings: ProxySettingsData) -> String {
         let valid = settings.models.filter { !$0.name.isEmpty && !$0.providerModel.isEmpty }
@@ -117,6 +137,7 @@ public enum YAMLEmitter {
             models.isEmpty ? "set()" : "{" + models.map { quote($0.name) }.sorted().joined(separator: ", ") + "}"
         }
         let native = valid.filter { $0.providerModel.lowercased().hasPrefix("openai/") }
+        let adaptive = valid.filter(\.usesAdaptiveThinking)
         return """
         # Généré automatiquement par LiteLLM-App — toute édition manuelle sera écrasée.
         from litellm.integrations.custom_logger import CustomLogger
@@ -127,6 +148,12 @@ public enum YAMLEmitter {
         # En-tête envoyé par Codex : modèle à utiliser quand il demande un modèle inconnu du proxy
         # (ex. « gpt-6.2-sol » choisi dans le sélecteur de l'app Codex).
         MODEL_HEADER = "\(modelHeader)"
+        # Claude ≥ 4.6 : réflexion « adaptive » + output_config.effort (« max » est refusé par LiteLLM).
+        ADAPTIVE_MODELS = \(pySet(adaptive))
+        ADAPTIVE_EFFORTS = {"minimal": "low", "low": "low", "medium": "medium", "high": "high",
+                            "xhigh": "xhigh", "max": "xhigh", "ultra": "xhigh"}
+        # Autres fournisseurs : niveaux standard (« minimal » donnerait un budget de réflexion trop petit).
+        STANDARD_EFFORTS = {"none": "none", "minimal": "low", "low": "low", "medium": "medium", "high": "high"}
 
 
         class LiteLLMAppHooks(CustomLogger):
@@ -141,12 +168,17 @@ public enum YAMLEmitter {
                 if isinstance(tools, list):
                     data["tools"] = [t for t in tools if not (isinstance(t, dict) and t.get("type") == "namespace")]
                 data.pop("client_metadata", None)
-                # Les niveaux de raisonnement de Codex (minimal, xhigh…) sont mal traduits pour les
-                # autres fournisseurs (ex. Claude récents) : le modèle garde son comportement par défaut.
                 reasoning = data.get("reasoning")
-                if isinstance(reasoning, dict):
-                    reasoning.pop("effort", None)
-                data.pop("reasoning_effort", None)
+                effort = reasoning.get("effort") if isinstance(reasoning, dict) else None
+                if effort is None:
+                    return data
+                if data.get("model") in ADAPTIVE_MODELS:
+                    reasoning.pop("effort")
+                    if effort != "none":
+                        data["thinking"] = {"type": "adaptive"}
+                        data["output_config"] = {"effort": ADAPTIVE_EFFORTS.get(effort, "high")}
+                else:
+                    reasoning["effort"] = STANDARD_EFFORTS.get(effort, "high")
                 return data
 
 

@@ -100,4 +100,20 @@ final class ProxyConfigTests: XCTestCase {
         try ProxyConfigWriter.write(settings: settings, masterKey: "k", to: dir.appendingPathComponent("config.yaml"))
         XCTAssertTrue(FileManager.default.fileExists(atPath: dir.appendingPathComponent("litellm_app_hooks.py").path))
     }
+
+    func testAdaptiveThinkingDetection() {
+        func adaptive(_ id: String) -> Bool { ProxyModel(name: "x", providerModel: id).usesAdaptiveThinking }
+        XCTAssertTrue(adaptive("anthropic/claude-opus-5-5"))
+        XCTAssertTrue(adaptive("anthropic/claude-sonnet-4-6"))
+        XCTAssertFalse(adaptive("anthropic/claude-sonnet-4-5"))
+        XCTAssertFalse(adaptive("anthropic/claude-opus-4-20250514"))
+        XCTAssertFalse(adaptive("anthropic/claude-3-5-sonnet-20241022"))
+        XCTAssertFalse(adaptive("mistral/mistral-large-latest"))
+
+        let hooks = YAMLEmitter.renderHooks(settings: ProxySettingsData(models: [
+            ProxyModel(name: "claude", providerModel: "anthropic/claude-opus-5-5"),
+        ]))
+        XCTAssertTrue(hooks.contains("ADAPTIVE_MODELS = {\"claude\"}"))
+        XCTAssertTrue(hooks.contains("data[\"output_config\"] = {\"effort\": ADAPTIVE_EFFORTS.get(effort, \"high\")}"))
+    }
 }

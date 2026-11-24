@@ -321,9 +321,10 @@ public enum CodexAppConfig {
     }
 
     /// Catalogue listant les modèles du proxy (`defaultModel` en premier).
-    public static func catalog(models: [String], defaultModel: String, template: [String: Any]?) throws -> Data {
-        let ordered = [defaultModel] + models.filter { $0 != defaultModel }
-        let entries: [[String: Any]] = ordered.enumerated().map { index, slug in
+    public static func catalog(models: [ProxyModel], defaultModel: String, template: [String: Any]?) throws -> Data {
+        let ordered = models.filter { $0.name == defaultModel } + models.filter { $0.name != defaultModel }
+        let entries: [[String: Any]] = ordered.enumerated().map { index, model in
+            let slug = model.name
             var entry = template ?? [
                 "base_instructions": "You are a coding agent running in the user's terminal. Use the available tools to inspect and edit files and run commands until the task is complete, then summarize what you did.",
                 "shell_type": "unified_exec",
@@ -332,19 +333,21 @@ public enum CodexAppConfig {
             ]
             entry["slug"] = slug
             entry["display_name"] = slug
-            entry["description"] = "LiteLLM-App"
+            entry["description"] = catalogTag
             entry["visibility"] = "list"
             entry["supported_in_api"] = true
             entry["priority"] = index
-            // Réglages propres aux modèles OpenAI (raisonnement, vitesse, sous-agents…) désactivés.
-            entry["supported_reasoning_levels"] = [Any]()
+            // Niveaux de raisonnement traduits par le hook du proxy (voir `YAMLEmitter.renderHooks`).
+            entry["supported_reasoning_levels"] = model.reasoningEfforts.map { ["effort": $0, "description": $0] }
+            entry["default_reasoning_level"] = "medium"
+            entry["supports_reasoning_effort_updates"] = true
+            // Réglages propres aux modèles OpenAI (vitesse, sous-agents…) désactivés.
             entry["experimental_supported_tools"] = [Any]()
             entry["additional_speed_tiers"] = [Any]()
             entry["service_tiers"] = [Any]()
             entry["supports_search_tool"] = false
-            entry["supports_reasoning_effort_updates"] = false
             entry["use_responses_lite"] = false
-            for key in ["tool_mode", "apply_patch_tool_type", "default_reasoning_level", "upgrade",
+            for key in ["tool_mode", "apply_patch_tool_type", "upgrade",
                         "availability_nux", "multi_agent_version", "multi_agent_reasoning_effort",
                         "available_access_programs"] {
                 entry.removeValue(forKey: key)
@@ -354,11 +357,15 @@ public enum CodexAppConfig {
         return try JSONSerialization.data(withJSONObject: ["models": entries], options: [.sortedKeys])
     }
 
-    /// Modèles listés dans le catalogue installé (vide s'il n'existe pas).
+    /// Description des entrées générées ; changer la version force « Mettre à jour » dans l'app.
+    static let catalogTag = "LiteLLM-App · v2"
+
+    /// Modèles listés dans le catalogue installé, s'il a été généré par cette version (vide sinon).
     public static func catalogModels() -> [String] {
         guard let data = try? Data(contentsOf: catalogURL),
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let models = root["models"] as? [[String: Any]] else { return [] }
+              let models = root["models"] as? [[String: Any]],
+              models.allSatisfy({ $0["description"] as? String == catalogTag }) else { return [] }
         return models.compactMap { $0["slug"] as? String }
     }
 

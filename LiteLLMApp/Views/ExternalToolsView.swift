@@ -221,7 +221,7 @@ struct ExternalToolsView: View {
             if enable {
                 // Catalogue : le sélecteur de Codex propose les modèles du proxy, en mode outils classique.
                 let template = await CodexAppConfig.fetchTemplate()
-                let catalog = try CodexAppConfig.catalog(models: validModels.map(\.name), defaultModel: model,
+                let catalog = try CodexAppConfig.catalog(models: validModels, defaultModel: model,
                                                          template: template)
                 try catalog.write(to: CodexAppConfig.catalogURL, options: .atomic)
                 try CodexAppConfig.write(CodexAppConfig.enable(in: current, baseURL: baseURL, apiKey: proxy.masterKey(),

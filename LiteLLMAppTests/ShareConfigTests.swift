@@ -107,15 +107,20 @@ final class ShareConfigTests: XCTestCase {
         let template = try XCTUnwrap(CodexAppConfig.template(fromCatalog: Data(raw.utf8)))
         XCTAssertEqual(template["slug"] as? String, "gpt-classic")
 
-        let data = try CodexAppConfig.catalog(models: ["a", "b"], defaultModel: "b", template: template)
+        let data = try CodexAppConfig.catalog(models: [ProxyModel(name: "a", providerModel: "mistral/mistral-large"),
+                                                       ProxyModel(name: "b", providerModel: "anthropic/claude-opus-5-5")],
+                                              defaultModel: "b", template: template)
         let models = try XCTUnwrap((JSONSerialization.jsonObject(with: data) as? [String: Any])?["models"] as? [[String: Any]])
         XCTAssertEqual(models.map { $0["slug"] as? String }, ["b", "a"])
         XCTAssertEqual(models[0]["base_instructions"] as? String, "B")
         XCTAssertNil(models[0]["apply_patch_tool_type"])
-        XCTAssertEqual((models[0]["supported_reasoning_levels"] as? [Any])?.count, 0)
+        XCTAssertEqual((models[0]["supported_reasoning_levels"] as? [[String: Any]])?.compactMap { $0["effort"] as? String },
+                       ["low", "medium", "high", "xhigh"])
+        XCTAssertEqual((models[1]["supported_reasoning_levels"] as? [Any])?.count, 3)
 
         // Sans CLI Codex : entrée minimale autonome.
-        let fallback = try CodexAppConfig.catalog(models: ["m"], defaultModel: "m", template: nil)
+        let fallback = try CodexAppConfig.catalog(models: [ProxyModel(name: "m", providerModel: "openai/gpt-5")],
+                                                  defaultModel: "m", template: nil)
         XCTAssertTrue(String(decoding: fallback, as: UTF8.self).contains("base_instructions"))
     }
 
