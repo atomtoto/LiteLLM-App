@@ -39,8 +39,6 @@ public final class ProxyManager: ObservableObject {
     private var adoptedPID: Int32?
     private var healthTask: Task<Void, Never>?
     private var installTask: Task<Void, Never>?
-    /// Réglages utilisés au dernier démarrage (pour détecter `needsRestart`).
-    private var startedSettings: ProxySettingsData?
 
     public init(appSupport: URL? = nil) {
         self.appSupport = appSupport ?? ProxyPaths.appSupport()
@@ -263,6 +261,7 @@ public final class ProxyManager: ObservableObject {
             adoptedPID = readPIDFile()
             state = .running(external: adoptedPID == nil)
             isHealthy = await checkHealth()
+            refreshNeedsRestart()
             appendProxy("Un proxy répond déjà sur \(settings.host):\(settings.port)"
                         + (adoptedPID != nil ? " — pid \(adoptedPID!) adopté (arrêtable)." : " — démarré hors de l'app.") + "\n")
             startHealthPolling()
@@ -276,7 +275,6 @@ public final class ProxyManager: ObservableObject {
         }
 
         state = .starting
-        startedSettings = settings
         needsRestart = false
         proxyLog = ""
         appendProxy("Démarrage : \(litellmBinary.path) --config \(configFile.path) --port \(settings.port) --host \(settings.host)\n")
@@ -464,9 +462,20 @@ public final class ProxyManager: ObservableObject {
 
     public func saveSettings() {
         ProxySettingsStore.save(settings, to: settingsFile)
-        if let startedSettings, canStop {
-            needsRestart = startedSettings.models != settings.models
-        }
+        refreshNeedsRestart()
+    }
+
+    /// Vrai si le proxy en cours tourne avec un `config.yaml` qui ne correspond plus aux
+    /// réglages actuels. On compare le fichier sur disque (et non l'état mémoire) pour couvrir
+    /// aussi un proxy adopté, démarré lors d'une exécution précédente de l'app.
+    public var isConfigStale: Bool {
+        let expected = YAMLEmitter.renderConfig(settings: settings, masterKey: masterKey())
+        let current = try? String(contentsOf: configFile, encoding: .utf8)
+        return current != expected
+    }
+
+    private func refreshNeedsRestart() {
+        needsRestart = canStop && isConfigStale
     }
 
     // MARK: - Process utilitaire

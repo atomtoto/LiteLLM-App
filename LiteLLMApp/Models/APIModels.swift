@@ -183,6 +183,8 @@ public enum FriendlyError {
                 hint = l10n.t("Le fournisseur a mis trop de temps à répondre. Réessayez dans un instant.")
             case 429:
                 hint = l10n.t("Limite atteinte chez le fournisseur (trop de requêtes ou crédit épuisé). Patientez un peu ou vérifiez votre compte chez le fournisseur.")
+            case 400 where detail.contains("Invalid model name"):
+                hint = l10n.t("Le service IA ne connaît pas encore ce modèle. Redémarrez le service dans « Fournisseurs d'IA », puis réessayez.")
             case 400:
                 hint = l10n.t("La requête a été refusée par le fournisseur. Vérifiez que le modèle choisi est correct.")
             case 500...599:

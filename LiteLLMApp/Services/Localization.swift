@@ -417,5 +417,6 @@ public final class L10n {
         "clé API manquante": "API key missing",
         "Écriture du config.yaml : %@": "Writing config.yaml: %@",
         "Écrivez votre message…": "Type your message…",
+        "Le service IA ne connaît pas encore ce modèle. Redémarrez le service dans « Fournisseurs d'IA », puis réessayez.": "The AI service doesn't know this model yet. Restart the service in “AI Providers”, then retry.",
     ]
 }

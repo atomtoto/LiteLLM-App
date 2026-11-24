@@ -406,6 +406,8 @@ struct OnboardingView: View {
     /// (l'utilisateur a pu revenir en arrière pour corriger sa clé).
     private func commitDraft() {
         guard isDraftValid else { return }
+        // Nettoie les entrées incomplètes (sans nom) laissées par une configuration abandonnée.
+        proxy.settings.models.removeAll { $0.id != draft.id && $0.name.trimmingCharacters(in: .whitespaces).isEmpty }
         if let index = proxy.settings.models.firstIndex(where: { $0.id == draft.id }) {
             proxy.settings.models[index] = draft
         } else {
@@ -424,7 +426,9 @@ struct OnboardingView: View {
             _ = await proxy.installAndWait()
         }
         guard proxy.isInstalled else { return }
-        if proxy.isRunning && proxy.needsRestart {
+        // Le proxy peut tourner avec une ancienne configuration (ex. démarré avant l'ajout
+        // de ce fournisseur) : on le redémarre pour qu'il connaisse le modèle choisi.
+        if proxy.isRunning && proxy.canStop && proxy.isConfigStale {
             await proxy.stopAndWait()
         }
         if !proxy.isRunning {
@@ -437,6 +441,10 @@ struct OnboardingView: View {
 
     private func runTest() async {
         testState = .testing
+        if proxy.canStop && proxy.isConfigStale {
+            await proxy.stopAndWait()
+            _ = await proxy.startAndWait()
+        }
         guard let url = proxy.baseURL else {
             testState = .failed(t("URL du serveur invalide."))
             return
