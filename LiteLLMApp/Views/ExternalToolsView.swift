@@ -8,6 +8,7 @@ struct ExternalToolsView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("externalTool") private var tool: ExternalTool = .codex
     @AppStorage("externalToolModel") private var model = ""
+    @AppStorage("codexContextLimit") private var contextLimit = CodexAppConfig.defaultContextLimit
     @State private var copied = false
     @State private var launchError: String?
     /// Contenu actuel de `~/.codex/config.toml` (outil « App Codex »).
@@ -141,8 +142,14 @@ struct ExternalToolsView: View {
         let enabled = CodexAppConfig.isEnabled(codexToml)
         let upToDate = codexToml == CodexAppConfig.enable(in: codexToml, baseURL: baseURL, apiKey: proxy.masterKey(),
                                                           model: model, catalogPath: CodexAppConfig.catalogURL.path)
-            && CodexAppConfig.catalogModels() == [model] + validModels.map(\.name).filter { $0 != model }
+            && CodexAppConfig.catalogModels(contextLimit: contextLimit)
+                == [model] + validModels.map(\.name).filter { $0 != model }
         return Section {
+            Picker(t("Contexte maximum"), selection: $contextLimit) {
+                ForEach(CodexAppConfig.contextLimits, id: \.self) { limit in
+                    Text(contextLabel(limit)).tag(limit)
+                }
+            }
             LabeledContent {
                 HStack {
                     if isApplying {
@@ -164,7 +171,7 @@ struct ExternalToolsView: View {
                           systemImage: "checkmark.circle.fill")
                     Text(upToDate
                          ? t("Quittez puis rouvrez l'app Codex pour appliquer le changement.")
-                         : t("Le modèle ou la clé du service a changé : mettez à jour la configuration."))
+                         : t("Les réglages ont changé : mettez à jour la configuration."))
                 } else {
                     Label(t("Désactivé"), systemImage: "circle")
                     Text(t("L'app Codex utilise ses modèles OpenAI habituels."))
@@ -173,12 +180,20 @@ struct ExternalToolsView: View {
         } header: {
             Text(t("App Codex"))
         } footer: {
-            Text(t("Modifie ~/.codex/config.toml (une sauvegarde est créée à côté) ; le CLI codex est aussi concerné. Tant que c'est activé, LiteLLM-App doit rester ouverte. « Désactiver » restaure vos réglages d'origine."))
-                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(t("Contexte maximum : Codex résume la conversation en approchant cette taille. Plus grand = plus de mémoire, mais des requêtes plus chères. Limité automatiquement au maximum de chaque modèle."))
+                Text(t("Modifie ~/.codex/config.toml (une sauvegarde est créée à côté) ; le CLI codex est aussi concerné. Tant que c'est activé, LiteLLM-App doit rester ouverte. « Désactiver » restaure vos réglages d'origine."))
+            }
+            .foregroundStyle(.secondary)
         }
     }
 
     // MARK: - Textes
+
+    private func contextLabel(_ limit: Int) -> String {
+        let size = CodexAppConfig.formatTokens(limit)
+        return limit == CodexAppConfig.defaultContextLimit ? tf("%@ tokens (recommandé)", size) : tf("%@ tokens", size)
+    }
 
     private func title(of tool: ExternalTool) -> String {
         switch tool {
@@ -221,8 +236,9 @@ struct ExternalToolsView: View {
             if enable {
                 // Catalogue : le sélecteur de Codex propose les modèles du proxy, en mode outils classique.
                 let template = await CodexAppConfig.fetchTemplate()
-                let catalog = try CodexAppConfig.catalog(models: validModels, defaultModel: model,
-                                                         template: template)
+                let windows = await CodexAppConfig.fetchContextWindows(baseURL: baseURL, apiKey: proxy.masterKey())
+                let catalog = try CodexAppConfig.catalog(models: validModels, defaultModel: model, template: template,
+                                                         contextLimit: contextLimit, contextWindows: windows)
                 try catalog.write(to: CodexAppConfig.catalogURL, options: .atomic)
                 try CodexAppConfig.write(CodexAppConfig.enable(in: current, baseURL: baseURL, apiKey: proxy.masterKey(),
                                                                model: model, catalogPath: CodexAppConfig.catalogURL.path))

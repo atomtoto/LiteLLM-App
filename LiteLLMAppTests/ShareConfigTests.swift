@@ -131,4 +131,24 @@ final class ShareConfigTests: XCTestCase {
         XCTAssertTrue(enabled.contains("# LiteLLM-App: model_catalog_json = \"/old.json\""))
         XCTAssertEqual(CodexAppConfig.disable(in: enabled), original)
     }
+
+    func testCodexCatalogCapsContextWindow() throws {
+        let info = """
+        {"data":[{"model_name":"big","model_info":{"max_input_tokens":1000000}},
+                 {"model_name":"small","model_info":{"max_input_tokens":32000}},
+                 {"model_name":"unknown","model_info":{"max_input_tokens":null}}]}
+        """
+        let windows = CodexAppConfig.contextWindows(fromModelInfo: Data(info.utf8))
+        XCTAssertEqual(windows, ["big": 1_000_000, "small": 32_000])
+
+        let models = ["big", "small", "unknown"].map { ProxyModel(name: $0, providerModel: "x/\($0)") }
+        let data = try CodexAppConfig.catalog(models: models, defaultModel: "big", template: nil,
+                                              contextLimit: 272_000, contextWindows: windows)
+        let entries = try XCTUnwrap((JSONSerialization.jsonObject(with: data) as? [String: Any])?["models"] as? [[String: Any]])
+        let byName = Dictionary(uniqueKeysWithValues: entries.map { ($0["slug"] as! String, $0["context_window"] as? Int) })
+        XCTAssertEqual(byName["big"], 272_000)      // plafonné au réglage
+        XCTAssertEqual(byName["small"], 32_000)     // plafonné au maximum du modèle
+        XCTAssertEqual(byName["unknown"], 272_000)  // inconnu : réglage
+        XCTAssertEqual(entries[0]["description"] as? String, "LiteLLM-App · 272k max")
+    }
 }

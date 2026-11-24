@@ -321,7 +321,11 @@ public enum CodexAppConfig {
     }
 
     /// Catalogue listant les modèles du proxy (`defaultModel` en premier).
-    public static func catalog(models: [ProxyModel], defaultModel: String, template: [String: Any]?) throws -> Data {
+    /// `contextLimit` : fenêtre de contexte annoncée à Codex (il compacte en l'approchant), ramenée
+    /// au maximum réel de chaque modèle quand il est connu (`contextWindows`, voir `fetchContextWindows`).
+    public static func catalog(models: [ProxyModel], defaultModel: String, template: [String: Any]?,
+                               contextLimit: Int = defaultContextLimit,
+                               contextWindows: [String: Int] = [:]) throws -> Data {
         let ordered = models.filter { $0.name == defaultModel } + models.filter { $0.name != defaultModel }
         let entries: [[String: Any]] = ordered.enumerated().map { index, model in
             let slug = model.name
@@ -333,7 +337,10 @@ public enum CodexAppConfig {
             ]
             entry["slug"] = slug
             entry["display_name"] = slug
-            entry["description"] = catalogTag
+            entry["description"] = catalogDescription(contextLimit: contextLimit)
+            let window = min(contextWindows[slug] ?? contextLimit, contextLimit)
+            entry["context_window"] = window
+            entry["max_context_window"] = window
             entry["visibility"] = "list"
             entry["supported_in_api"] = true
             entry["priority"] = index
@@ -357,16 +364,55 @@ public enum CodexAppConfig {
         return try JSONSerialization.data(withJSONObject: ["models": entries], options: [.sortedKeys])
     }
 
-    /// Description des entrées générées ; changer la version force « Mettre à jour » dans l'app.
-    static let catalogTag = "LiteLLM-App · v2"
+    /// Tailles de contexte proposées dans l'app ; 272k est la valeur de Codex pour ses propres modèles.
+    public static let contextLimits = [128_000, 272_000, 500_000, 1_000_000]
+    public static let defaultContextLimit = 272_000
 
-    /// Modèles listés dans le catalogue installé, s'il a été généré par cette version (vide sinon).
-    public static func catalogModels() -> [String] {
+    /// Description affichée dans le sélecteur de Codex. Elle sert aussi à repérer un catalogue
+    /// généré avec d'autres réglages (« Mettre à jour » dans l'app).
+    static func catalogDescription(contextLimit: Int) -> String {
+        "LiteLLM-App · \(formatTokens(contextLimit)) max"
+    }
+
+    /// « 272k », « 1M »…
+    public static func formatTokens(_ count: Int) -> String {
+        count >= 1_000_000 && count % 1_000_000 == 0 ? "\(count / 1_000_000)M" : "\(count / 1000)k"
+    }
+
+    /// Modèles listés dans le catalogue installé, s'il a été généré avec ces réglages (vide sinon).
+    public static func catalogModels(contextLimit: Int) -> [String] {
         guard let data = try? Data(contentsOf: catalogURL),
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let models = root["models"] as? [[String: Any]],
-              models.allSatisfy({ $0["description"] as? String == catalogTag }) else { return [] }
+              models.allSatisfy({ $0["description"] as? String == catalogDescription(contextLimit: contextLimit) })
+        else { return [] }
         return models.compactMap { $0["slug"] as? String }
+    }
+
+    /// Taille de contexte réelle de chaque modèle selon le proxy (`/model/info`, `max_input_tokens`).
+    /// Vide si le proxy ne répond pas ; les modèles inconnus de LiteLLM sont absents.
+    public static func fetchContextWindows(baseURL: String, apiKey: String) async -> [String: Int] {
+        var base = baseURL
+        while base.hasSuffix("/") { base.removeLast() }
+        guard let url = URL(string: base + "/model/info") else { return [:] }
+        var request = URLRequest(url: url, timeoutInterval: 15)
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        guard let (data, _) = try? await URLSession.shared.data(for: request) else { return [:] }
+        return contextWindows(fromModelInfo: data)
+    }
+
+    static func contextWindows(fromModelInfo data: Data) -> [String: Int] {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let entries = root["data"] as? [[String: Any]] else { return [:] }
+        var windows: [String: Int] = [:]
+        for entry in entries {
+            guard let name = entry["model_name"] as? String,
+                  let tokens = (entry["model_info"] as? [String: Any])?["max_input_tokens"] as? Int,
+                  tokens > 0 else { continue }
+            // Plusieurs déploiements pour un même nom : on garde le plus petit.
+            windows[name] = min(windows[name] ?? tokens, tokens)
+        }
+        return windows
     }
 
     // MARK: Fichier

@@ -451,9 +451,12 @@ public final class L10n {
         "Désactivé": "Disabled",
         "Activé avec « %@ »": "Enabled with “%@”",
         "Quittez puis rouvrez l'app Codex pour appliquer le changement.": "Quit and reopen the Codex app to apply the change.",
-        "Le modèle ou la clé du service a changé : mettez à jour la configuration.": "The model or service key changed: update the configuration.",
+        "Les réglages ont changé : mettez à jour la configuration.": "Settings changed: update the configuration.",
         "L'app Codex utilise ses modèles OpenAI habituels.": "The Codex app uses its usual OpenAI models.",
         "Modifie ~/.codex/config.toml (une sauvegarde est créée à côté) ; le CLI codex est aussi concerné. Tant que c'est activé, LiteLLM-App doit rester ouverte. « Désactiver » restaure vos réglages d'origine.": "Edits ~/.codex/config.toml (a backup is saved next to it); the codex CLI is affected too. While enabled, LiteLLM-App must stay open. “Disable” restores your original settings.",
         "L'app Codex pour Mac utilisera le modèle choisi (Claude, Mistral, Gemini…) au lieu des modèles OpenAI, jusqu'à ce que vous désactiviez l'option.": "The Codex Mac app will use the chosen model (Claude, Mistral, Gemini…) instead of OpenAI models until you disable this option.",
+        "Contexte maximum": "Maximum context",
+        "%@ tokens (recommandé)": "%@ tokens (recommended)",
+        "Contexte maximum : Codex résume la conversation en approchant cette taille. Plus grand = plus de mémoire, mais des requêtes plus chères. Limité automatiquement au maximum de chaque modèle.": "Maximum context: Codex summarizes the conversation as it nears this size. Larger = more memory, but more expensive requests. Automatically capped at each model's maximum.",
     ]
 }
