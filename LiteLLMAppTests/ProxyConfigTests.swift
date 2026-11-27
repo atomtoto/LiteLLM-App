@@ -94,6 +94,9 @@ final class ProxyConfigTests: XCTestCase {
         XCTAssertTrue(YAMLEmitter.renderHooks(settings: ProxySettingsData()).contains("NATIVE_MODELS = set()"))
         XCTAssertTrue(hooks.contains("proxy_handler_instance = LiteLLMAppHooks()"))
         XCTAssertTrue(hooks.contains("\n    async def async_pre_call_hook("))
+        // Codex envoie « safeguards » : retiré avant transmission aux fournisseurs non-OpenAI
+        // (Mistral renvoie sinon une 422 « extra_forbidden »).
+        XCTAssertTrue(hooks.contains("data.pop(\"safeguards\", None)"))
 
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

@@ -129,7 +129,7 @@ public enum YAMLEmitter {
 
     /// Hook appliqué avant chaque requête : redirige les modèles inconnus vers le modèle choisi
     /// pour Codex, retire ce que seuls les modèles OpenAI comprennent (outils `namespace`,
-    /// `client_metadata`) et traduit le niveau de raisonnement, sans quoi
+    /// `client_metadata`, champ `safeguards`) et traduit le niveau de raisonnement, sans quoi
     /// Anthropic, Mistral… renvoient une erreur.
     public static func renderHooks(settings: ProxySettingsData) -> String {
         let valid = settings.models.filter { !$0.name.isEmpty && !$0.providerModel.isEmpty }
@@ -183,6 +183,9 @@ public enum YAMLEmitter {
                 if isinstance(items, list):
                     data["input"] = [i for i in items if not is_server_tool_item(i)]
                 data.pop("client_metadata", None)
+                # « safeguards » envoyé par Codex (classifieur dangerous_tool_use) : les fournisseurs
+                # autres qu'OpenAI le rejettent (422 extra_forbidden).
+                data.pop("safeguards", None)
                 reasoning = data.get("reasoning")
                 effort = reasoning.get("effort") if isinstance(reasoning, dict) else None
                 if effort is None:
