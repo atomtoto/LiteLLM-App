@@ -128,9 +128,9 @@ public enum YAMLEmitter {
     public static let modelHeader = "x-litellm-app-model"
 
     /// Hook appliqué avant chaque requête : redirige les modèles inconnus vers le modèle choisi
-    /// pour Codex, retire ce que seuls les modèles OpenAI comprennent (outils `namespace`,
-    /// `client_metadata`, champ `safeguards`) et traduit le niveau de raisonnement, sans quoi
-    /// Anthropic, Mistral… renvoient une erreur.
+    /// pour Codex, retire ce que seuls les modèles OpenAI/Anthropic comprennent (outils `namespace`,
+    /// `client_metadata`, champs `safeguards` et `output_config`) et traduit le niveau de
+    /// raisonnement, sans quoi Mistral… renvoient une erreur.
     public static func renderHooks(settings: ProxySettingsData) -> String {
         let valid = settings.models.filter { !$0.name.isEmpty && !$0.providerModel.isEmpty }
         func pySet(_ models: [ProxyModel]) -> String {
@@ -186,17 +186,26 @@ public enum YAMLEmitter {
                 # « safeguards » envoyé par Codex (classifieur dangerous_tool_use) : les fournisseurs
                 # autres qu'OpenAI le rejettent (422 extra_forbidden).
                 data.pop("safeguards", None)
+                # « output_config » (Anthropic, envoyé ex. par Claude Code CLI) : inconnu de LiteLLM,
+                # il serait transmis tel quel au fournisseur (422 extra_forbidden). On en récupère
+                # l'effort — c'est la seule source quand il n'y a pas de « reasoning » — puis on le retire.
+                output_config = data.pop("output_config", None)
                 reasoning = data.get("reasoning")
                 effort = reasoning.get("effort") if isinstance(reasoning, dict) else None
+                if effort is None and isinstance(output_config, dict):
+                    effort = output_config.get("effort")
                 if effort is None:
                     return data
                 if data.get("model") in ADAPTIVE_MODELS:
-                    reasoning.pop("effort")
+                    if isinstance(reasoning, dict):
+                        reasoning.pop("effort", None)
                     if effort != "none":
                         data["thinking"] = {"type": "adaptive"}
                         data["output_config"] = {"effort": ADAPTIVE_EFFORTS.get(effort, "high")}
-                else:
+                elif isinstance(reasoning, dict):
                     reasoning["effort"] = STANDARD_EFFORTS.get(effort, "high")
+                else:
+                    data["reasoning"] = {"effort": STANDARD_EFFORTS.get(effort, "high")}
                 return data
 
 

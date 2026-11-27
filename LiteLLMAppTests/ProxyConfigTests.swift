@@ -97,6 +97,10 @@ final class ProxyConfigTests: XCTestCase {
         // Codex envoie « safeguards » : retiré avant transmission aux fournisseurs non-OpenAI
         // (Mistral renvoie sinon une 422 « extra_forbidden »).
         XCTAssertTrue(hooks.contains("data.pop(\"safeguards\", None)"))
+        // Claude Code envoie « output_config » (Anthropic) : retiré lui aussi, son effort servant
+        // de repli quand la requête n'a pas de « reasoning ».
+        XCTAssertTrue(hooks.contains("output_config = data.pop(\"output_config\", None)"))
+        XCTAssertTrue(hooks.contains("if effort is None and isinstance(output_config, dict):"))
 
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
