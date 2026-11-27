@@ -199,13 +199,21 @@ public enum YAMLEmitter {
                 if data.get("model") in ADAPTIVE_MODELS:
                     if isinstance(reasoning, dict):
                         reasoning.pop("effort", None)
+                        if not reasoning:
+                            data.pop("reasoning", None)
                     if effort != "none":
                         data["thinking"] = {"type": "adaptive"}
                         data["output_config"] = {"effort": ADAPTIVE_EFFORTS.get(effort, "high")}
-                elif isinstance(reasoning, dict):
-                    reasoning["effort"] = STANDARD_EFFORTS.get(effort, "high")
                 else:
-                    data["reasoning"] = {"effort": STANDARD_EFFORTS.get(effort, "high")}
+                    # « reasoning » (dict) n'est pas un paramètre LiteLLM pour tous les fournisseurs :
+                    # Mistral le transmet tel quel et répond 422 extra_forbidden. On le convertit en
+                    # « reasoning_effort », que LiteLLM traduit selon le fournisseur — et ignore
+                    # (drop_params) quand il ne s'applique pas (mistral-large ; seuls les modèles
+                    # « magistral » le supportent côté Mistral).
+                    data.pop("reasoning", None)
+                    mapped = STANDARD_EFFORTS.get(effort, "high")
+                    if mapped != "none":
+                        data["reasoning_effort"] = mapped
                 return data
 
 

@@ -101,6 +101,10 @@ final class ProxyConfigTests: XCTestCase {
         // de repli quand la requête n'a pas de « reasoning ».
         XCTAssertTrue(hooks.contains("output_config = data.pop(\"output_config\", None)"))
         XCTAssertTrue(hooks.contains("if effort is None and isinstance(output_config, dict):"))
+        // « reasoning » (dict) est converti en « reasoning_effort » pour les modèles non adaptatifs :
+        // Mistral sinon renvoie 422 extra_forbidden sur « reasoning ».
+        XCTAssertTrue(hooks.contains("data.pop(\"reasoning\", None)"))
+        XCTAssertTrue(hooks.contains("data[\"reasoning_effort\"] = mapped"))
 
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
