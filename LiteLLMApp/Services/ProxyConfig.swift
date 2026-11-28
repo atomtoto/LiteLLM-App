@@ -128,9 +128,9 @@ public enum YAMLEmitter {
     public static let modelHeader = "x-litellm-app-model"
 
     /// Hook appliqué avant chaque requête : redirige les modèles inconnus vers le modèle choisi
-    /// pour Codex, retire ce que seuls les modèles OpenAI/Anthropic comprennent (outils `namespace`,
-    /// `client_metadata`, champs `safeguards` et `output_config`) et traduit le niveau de
-    /// raisonnement, sans quoi Mistral… renvoient une erreur.
+    /// pour Codex/Claude Code, retire ce que seuls les modèles OpenAI/Anthropic comprennent (outils
+    /// `namespace`, `client_metadata`, champs `safeguards`, `output_config`, `thinking_blocks` dans
+    /// l'historique) et traduit le niveau de raisonnement, sans quoi Mistral… renvoient une erreur.
     public static func renderHooks(settings: ProxySettingsData) -> String {
         let valid = settings.models.filter { !$0.name.isEmpty && !$0.providerModel.isEmpty }
         func pySet(_ models: [ProxyModel]) -> String {
@@ -182,6 +182,18 @@ public enum YAMLEmitter {
                 items = data.get("input")
                 if isinstance(items, list):
                     data["input"] = [i for i in items if not is_server_tool_item(i)]
+                # Historique « messages » (Claude Code CLI) : « thinking_blocks » et les blocs
+                # « thinking » sont propres à Anthropic ; Mistral les rejette (422 extra_forbidden).
+                messages = data.get("messages")
+                if isinstance(messages, list):
+                    for msg in messages:
+                        if not isinstance(msg, dict):
+                            continue
+                        msg.pop("thinking_blocks", None)
+                        content = msg.get("content")
+                        if isinstance(content, list):
+                            msg["content"] = [b for b in content
+                                              if not (isinstance(b, dict) and b.get("type") in ("thinking", "redacted_thinking"))]
                 data.pop("client_metadata", None)
                 # « safeguards » envoyé par Codex (classifieur dangerous_tool_use) : les fournisseurs
                 # autres qu'OpenAI le rejettent (422 extra_forbidden).

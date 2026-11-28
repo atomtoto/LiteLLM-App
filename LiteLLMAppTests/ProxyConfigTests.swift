@@ -105,6 +105,9 @@ final class ProxyConfigTests: XCTestCase {
         // Mistral sinon renvoie 422 extra_forbidden sur « reasoning ».
         XCTAssertTrue(hooks.contains("data.pop(\"reasoning\", None)"))
         XCTAssertTrue(hooks.contains("data[\"reasoning_effort\"] = mapped"))
+        // Historique « messages » : « thinking_blocks » retiré (Mistral sinon 422 extra_forbidden).
+        XCTAssertTrue(hooks.contains("msg.pop(\"thinking_blocks\", None)"))
+        XCTAssertTrue(hooks.contains("(\"thinking\", \"redacted_thinking\")"))
 
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
